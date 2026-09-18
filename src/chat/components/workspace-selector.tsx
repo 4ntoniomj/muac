@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { FolderOpen, CheckCircle2, AlertCircle, X, Check, GitBranch } from 'lucide-react';
+import { FolderOpen, CheckCircle2, AlertCircle, X, Check, GitBranch, FolderSearch } from 'lucide-react';
 
 interface WorkspaceSelectorProps {
   projectPath?: string;
@@ -22,7 +22,26 @@ export function WorkspaceSelector({
     error?: string;
   } | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [isBrowsing, setIsBrowsing] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const handleBrowseWorkspace = async () => {
+    setIsBrowsing(true);
+    try {
+      const res = await fetch('/api/workspace/browse', { method: 'POST' });
+      const data = await res.json();
+      if (data.success && data.path) {
+        setTempPath(data.path);
+        validatePath(data.path);
+      } else if (data.error) {
+        alert(data.error);
+      }
+    } catch (err) {
+      console.error('Error abriendo gestor de archivos:', err);
+    } finally {
+      setIsBrowsing(false);
+    }
+  };
 
   useEffect(() => {
     setTempPath(projectPath);
@@ -140,6 +159,20 @@ export function WorkspaceSelector({
               placeholder="/home/usuario/mi-proyecto"
               className="flex-1 bg-surface border border-surface-border focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none"
             />
+            <button
+              type="button"
+              onClick={handleBrowseWorkspace}
+              disabled={isBrowsing}
+              title="Abrir el gestor de archivos nativo para elegir carpeta"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-elevated hover:bg-slate-800 border border-surface-border text-xs text-slate-300 hover:text-white transition-all shrink-0"
+            >
+              {isBrowsing ? (
+                <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+              ) : (
+                <FolderSearch className="w-3.5 h-3.5 text-amber-400" />
+              )}
+              <span>Examinar</span>
+            </button>
           </div>
 
           {/* Resultado de validación en tiempo real */}

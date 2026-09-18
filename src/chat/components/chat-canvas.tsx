@@ -5,10 +5,13 @@ import type { Message, ContextWindowUsage } from '@/shared/types/chat';
 import type { AccountWithQuota } from '@/shared/types/account';
 import { ContextRing } from './context-ring';
 import { ModelSelector } from './model-selector';
+import { ReasoningSlider } from './reasoning-slider';
+import { AgentActivityBanner } from './agent-activity-banner';
 import { AccountSelector } from '@/cuentas/components/account-selector';
 import { WorkspaceSelector } from './workspace-selector';
 import { calculateContextUsage } from '../context-calc';
-import { ANTIGRAVITY_MODELS } from '@/shared/types/model';
+import { findModel } from '@/shared/types/model';
+import type { AgentActivity } from '@/chat/agy-bridge';
 import {
   Send,
   Sparkles,
@@ -27,6 +30,9 @@ interface ChatCanvasProps {
   messages: Message[];
   activeModelId: string;
   onSelectModel: (modelId: string) => void;
+  activeReasoningEffort: 'low' | 'medium' | 'high';
+  onSelectReasoningEffort: (effort: 'low' | 'medium' | 'high') => void;
+  activities: AgentActivity[];
   accounts: AccountWithQuota[];
   activeAccountId: string;
   onSelectAccount: (accountId: string) => void;
@@ -46,6 +52,9 @@ export function ChatCanvas({
   messages,
   activeModelId,
   onSelectModel,
+  activeReasoningEffort,
+  onSelectReasoningEffort,
+  activities,
   accounts,
   activeAccountId,
   onSelectAccount,
@@ -64,8 +73,7 @@ export function ChatCanvas({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const activeModel =
-    ANTIGRAVITY_MODELS.find((m) => m.id === activeModelId) || ANTIGRAVITY_MODELS[0];
+  const activeModel = findModel(activeModelId);
 
   // Cálculo en tiempo real de la ventana de contexto para el aro
   const contextUsage: ContextWindowUsage = calculateContextUsage(
@@ -253,19 +261,25 @@ export function ChatCanvas({
           })
         )}
 
-        {/* Mensaje en Streaming */}
-        {isStreaming && streamingDelta && (
-          <div className="flex gap-3.5 text-xs leading-relaxed justify-start">
-            <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5 animate-pulse">
-              <Bot className="w-4 h-4" />
-            </div>
+        {/* Mensaje en Streaming y Observabilidad */}
+        {isStreaming && (
+          <div className="flex flex-col gap-2">
+            <AgentActivityBanner activities={activities} isStreaming={isStreaming} />
 
-            <div className="max-w-[80%] rounded-2xl rounded-tl-sm px-4 py-3 bg-surface-elevated border border-surface-border text-slate-200 shadow-md">
-              <div className="whitespace-pre-wrap font-sans text-xs break-words">
-                {streamingDelta}
-                <span className="inline-block w-1.5 h-3.5 ml-1 bg-blue-400 animate-pulse align-middle" />
+            {streamingDelta && (
+              <div className="flex gap-3.5 text-xs leading-relaxed justify-start">
+                <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5 animate-pulse">
+                  <Bot className="w-4 h-4" />
+                </div>
+
+                <div className="max-w-[80%] rounded-2xl rounded-tl-sm px-4 py-3 bg-surface-elevated border border-surface-border text-slate-200 shadow-md">
+                  <div className="whitespace-pre-wrap font-sans text-xs break-words">
+                    {streamingDelta}
+                    <span className="inline-block w-1.5 h-3.5 ml-1 bg-blue-400 animate-pulse align-middle" />
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -275,10 +289,15 @@ export function ChatCanvas({
       {/* Barra Inferior de Entrada (Input Bar) */}
       <div className="p-4 border-t border-surface-border bg-surface/50 backdrop-blur-md">
         <div className="max-w-4xl w-full mx-auto flex flex-col gap-2">
-          {/* Controles Superiores: Desplegables de Modelos, Cuentas, Workspace y Aro de Contexto */}
+          {/* Controles Superiores: Desplegables de Modelos, Esfuerzo, Cuentas, Workspace y Aro de Contexto */}
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2 flex-wrap">
               <ModelSelector selectedModelId={activeModelId} onSelectModel={onSelectModel} />
+              <ReasoningSlider
+                modelId={activeModelId}
+                effort={activeReasoningEffort}
+                onChangeEffort={onSelectReasoningEffort}
+              />
               <AccountSelector
                 accounts={accounts}
                 activeAccountId={activeAccountId}

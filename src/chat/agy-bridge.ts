@@ -7,11 +7,22 @@ import { syncStoredTokenToSystem } from '@/cuentas/keyring-sync';
 import { evaluateQuotaExhaustion, executeAutoRotation } from '@/rotacion/rotation-engine';
 import { fetchCurrentQuota } from '@/rotacion/quota-monitor';
 import { getGlobalSettings } from '@/configuracion/settings-store';
-import { ANTIGRAVITY_MODELS } from '@/shared/types/model';
+import { findModel } from '@/shared/types/model';
 import type { MessageUsage } from '@/shared/types/chat';
 
+export interface AgentActivity {
+  stepIndex: number;
+  stepType: 'tool' | 'thinking' | 'agent_response' | string;
+  state: 'ACTIVE' | 'DONE' | string;
+  toolName?: string;
+  toolParameters?: Record<string, unknown>;
+  toolOutput?: string;
+  durationSeconds?: number;
+  thinkingTokens?: number;
+}
+
 export interface StreamEvent {
-  type: 'delta' | 'done' | 'rotated' | 'error';
+  type: 'delta' | 'done' | 'rotated' | 'error' | 'activity';
   text?: string;
   usage?: MessageUsage;
   durationSeconds?: number;
@@ -24,6 +35,7 @@ export interface StreamEvent {
     toEmail: string;
     reason: string;
   };
+  activity?: AgentActivity;
 }
 
 export interface StreamOptions {
@@ -31,6 +43,7 @@ export interface StreamOptions {
   dangerouslySkipPermissions?: boolean;
   agentMode?: 'default' | 'accept-edits' | 'plan';
   sandboxMode?: boolean;
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
 
 export async function* streamPromptWithAgy(
@@ -41,7 +54,7 @@ export async function* streamPromptWithAgy(
   options?: StreamOptions
 ): AsyncGenerator<StreamEvent> {
   const settings = getGlobalSettings();
-  const model = ANTIGRAVITY_MODELS.find((m) => m.id === modelId) || ANTIGRAVITY_MODELS[0];
+  const model = findModel(modelId);
   const modelGroup = model.group;
 
   // 1. Resolver cuenta activa
@@ -102,12 +115,21 @@ export async function* streamPromptWithAgy(
     '--print',
     prompt,
     '--model',
-    modelId,
+    model.id,
     '--conversation',
     conversationId,
     '--output-format',
     'stream-json',
   ];
+
+  // Añadir esfuerzo de razonamiento si el modelo lo soporta
+  if (model.effortSupported) {
+    let effort = options?.reasoningEffort || settings.reasoningEffort || 'high';
+    if (model.supportedEfforts && model.supportedEfforts.length > 0 && !model.supportedEfforts.includes(effort)) {
+      effort = model.supportedEfforts[0];
+    }
+    args.push('--effort', effort);
+  }
 
   if (options?.projectPath && fs.existsSync(options.projectPath)) {
     workingDir = path.resolve(options.projectPath);
@@ -176,6 +198,37 @@ export async function* streamPromptWithAgy(
 
       if (parsed.event === 'step_update' && parsed.step_update) {
         const step = parsed.step_update;
+
+        // Emitir actividad de herramienta (ej. list_dir, run_command, view_file, etc.)
+        if (step.step_type === 'tool') {
+          yield {
+            type: 'activity',
+            activity: {
+              stepIndex: step.step_index,
+              stepType: 'tool',
+              state: step.state || 'ACTIVE',
+              toolName: step.tool_name || step.tool_info?.name || 'tool',
+              toolParameters: step.tool_info?.parameters,
+              toolOutput: typeof step.tool_info?.output === 'string'
+                ? step.tool_info.output.slice(0, 300)
+                : undefined,
+              durationSeconds: step.duration_seconds,
+            },
+          };
+        }
+
+        // Emitir actividad de razonamiento inicial
+        if (step.step_type === 'agent_response' && !step.text_delta && step.state === 'ACTIVE') {
+          yield {
+            type: 'activity',
+            activity: {
+              stepIndex: step.step_index,
+              stepType: 'thinking',
+              state: 'ACTIVE',
+            },
+          };
+        }
+
         if (step.text_delta) {
           accumulatedText += step.text_delta;
           yield { type: 'delta', text: step.text_delta };

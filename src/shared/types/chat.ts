@@ -16,6 +16,7 @@ export interface Message {
   accountId?: string;
   accountEmail?: string;
   modelId?: string;
+  reasoningEffort?: 'low' | 'medium' | 'high';
 }
 
 export interface Conversation {
@@ -24,6 +25,7 @@ export interface Conversation {
   createdAt: string;
   updatedAt: string;
   modelId: string;
+  reasoningEffort?: 'low' | 'medium' | 'high';
   totalTokens: number;
   messagesCount?: number;
   projectPath?: string;

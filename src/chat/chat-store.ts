@@ -21,6 +21,7 @@ export function listConversations(): Conversation[] {
     messages_count: number;
     project_path?: string;
     is_pinned?: number;
+    reasoning_effort?: 'low' | 'medium' | 'high';
   }>;
 
   return rows.map((r) => ({
@@ -29,6 +30,7 @@ export function listConversations(): Conversation[] {
     createdAt: r.created_at,
     updatedAt: r.updated_at,
     modelId: r.model_id,
+    reasoningEffort: r.reasoning_effort || 'high',
     totalTokens: r.total_tokens,
     messagesCount: r.messages_count,
     projectPath: r.project_path || undefined,
@@ -48,6 +50,7 @@ export function getConversation(id: string): Conversation | null {
     total_tokens: number;
     project_path?: string;
     is_pinned?: number;
+    reasoning_effort?: 'low' | 'medium' | 'high';
   } | undefined;
 
   if (!row) return null;
@@ -58,6 +61,7 @@ export function getConversation(id: string): Conversation | null {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     modelId: row.model_id,
+    reasoningEffort: row.reasoning_effort || 'high',
     totalTokens: row.total_tokens,
     projectPath: row.project_path || undefined,
     isPinned: Boolean(row.is_pinned),
@@ -66,8 +70,9 @@ export function getConversation(id: string): Conversation | null {
 
 export function createConversation(
   title?: string,
-  modelId: string = 'gemini-3.8-flash-high',
-  projectPath?: string
+  modelId: string = 'gemini-3.8-flash',
+  projectPath?: string,
+  reasoningEffort: 'low' | 'medium' | 'high' = 'high'
 ): Conversation {
   const db = getDatabase();
   const id = crypto.randomUUID();
@@ -75,9 +80,9 @@ export function createConversation(
   const convoTitle = title || 'Nueva conversación';
 
   db.prepare(`
-    INSERT INTO conversations (id, title, created_at, updated_at, model_id, total_tokens, project_path)
-    VALUES (?, ?, ?, ?, ?, 0, ?)
-  `).run(id, convoTitle, now, now, modelId, projectPath || null);
+    INSERT INTO conversations (id, title, created_at, updated_at, model_id, total_tokens, project_path, reasoning_effort)
+    VALUES (?, ?, ?, ?, ?, 0, ?, ?)
+  `).run(id, convoTitle, now, now, modelId, projectPath || null, reasoningEffort);
 
   return {
     id,
@@ -85,10 +90,35 @@ export function createConversation(
     createdAt: now,
     updatedAt: now,
     modelId,
+    reasoningEffort,
     totalTokens: 0,
     messagesCount: 0,
     projectPath: projectPath || undefined,
   };
+}
+
+export function updateConversationModelAndEffort(
+  id: string,
+  modelId: string,
+  effort?: 'low' | 'medium' | 'high'
+): boolean {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  if (effort) {
+    db.prepare('UPDATE conversations SET model_id = ?, reasoning_effort = ?, updated_at = ? WHERE id = ?').run(
+      modelId,
+      effort,
+      now,
+      id
+    );
+  } else {
+    db.prepare('UPDATE conversations SET model_id = ?, updated_at = ? WHERE id = ?').run(
+      modelId,
+      now,
+      id
+    );
+  }
+  return true;
 }
 
 export function updateConversationProjectPath(id: string, projectPath: string): boolean {
@@ -221,12 +251,20 @@ export function saveMessage(msg: Message): Message {
     msg.modelId ?? null
   );
 
-  // Actualizar timestamps y tokens de la conversación
-  db.prepare(`
-    UPDATE conversations 
-    SET updated_at = ?, total_tokens = total_tokens + ?
-    WHERE id = ?
-  `).run(now, msg.usage?.totalTokens ?? 0, msg.conversationId);
+  // Actualizar timestamps y tokens reales de la conversación
+  if (msg.usage && msg.usage.totalTokens > 0) {
+    db.prepare(`
+      UPDATE conversations 
+      SET updated_at = ?, total_tokens = ?
+      WHERE id = ?
+    `).run(now, msg.usage.totalTokens, msg.conversationId);
+  } else {
+    db.prepare(`
+      UPDATE conversations 
+      SET updated_at = ?
+      WHERE id = ?
+    `).run(now, msg.conversationId);
+  }
 
   return msg;
 }

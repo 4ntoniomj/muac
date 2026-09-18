@@ -8,6 +8,7 @@ import type { Conversation, Message } from '@/shared/types/chat';
 import type { AccountWithQuota } from '@/shared/types/account';
 import type { GlobalSettings } from '@/shared/types/settings';
 import type { RotationEvent } from '@/shared/types/quota';
+import type { AgentActivity } from '@/chat/agy-bridge';
 import { DEFAULT_SETTINGS } from '@/shared/types/settings';
 
 export default function MuacApp() {
@@ -19,6 +20,8 @@ export default function MuacApp() {
   const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_SETTINGS);
   const [rotationLogs, setRotationLogs] = useState<RotationEvent[]>([]);
   const [activeModelId, setActiveModelId] = useState<string>(DEFAULT_SETTINGS.defaultModelId);
+  const [activeReasoningEffort, setActiveReasoningEffort] = useState<'low' | 'medium' | 'high'>(DEFAULT_SETTINGS.reasoningEffort || 'high');
+  const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [activeProjectPath, setActiveProjectPath] = useState<string>('');
   const [authToast, setAuthToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
@@ -46,6 +49,9 @@ export default function MuacApp() {
       if (data.success && data.settings) {
         setSettings(data.settings);
         setActiveModelId(data.settings.defaultModelId || DEFAULT_SETTINGS.defaultModelId);
+        if (data.settings.reasoningEffort) {
+          setActiveReasoningEffort(data.settings.reasoningEffort);
+        }
         if (data.settings.defaultProjectPath && !activeProjectPath) {
           setActiveProjectPath(data.settings.defaultProjectPath);
         }
@@ -142,6 +148,9 @@ export default function MuacApp() {
         if (data.conversation?.modelId) {
           setActiveModelId(data.conversation.modelId);
         }
+        if (data.conversation?.reasoningEffort) {
+          setActiveReasoningEffort(data.conversation.reasoningEffort);
+        }
         if (data.conversation?.projectPath) {
           setActiveProjectPath(data.conversation.projectPath);
         }
@@ -165,6 +174,44 @@ export default function MuacApp() {
     }
   }, [activeConversationId, loadMessages]);
 
+  // Manejo de cambio de modelo con persistencia
+  const handleSelectModel = async (newModelId: string) => {
+    setActiveModelId(newModelId);
+    if (activeConversationId) {
+      try {
+        await fetch(`/api/conversations/${activeConversationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ modelId: newModelId }),
+        });
+        setConversations((prev) =>
+          prev.map((c) => (c.id === activeConversationId ? { ...c, modelId: newModelId } : c))
+        );
+      } catch (err) {
+        console.error('Error al actualizar modelo:', err);
+      }
+    }
+  };
+
+  // Manejo de cambio de esfuerzo de razonamiento con persistencia
+  const handleSelectReasoningEffort = async (newEffort: 'low' | 'medium' | 'high') => {
+    setActiveReasoningEffort(newEffort);
+    if (activeConversationId) {
+      try {
+        await fetch(`/api/conversations/${activeConversationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ reasoningEffort: newEffort }),
+        });
+        setConversations((prev) =>
+          prev.map((c) => (c.id === activeConversationId ? { ...c, reasoningEffort: newEffort } : c))
+        );
+      } catch (err) {
+        console.error('Error al actualizar esfuerzo de razonamiento:', err);
+      }
+    }
+  };
+
   // Manejo de nueva conversación
   const handleNewConversation = async () => {
     try {
@@ -174,6 +221,7 @@ export default function MuacApp() {
         body: JSON.stringify({
           title: 'Nueva conversación',
           modelId: activeModelId,
+          reasoningEffort: activeReasoningEffort,
           projectPath: activeProjectPath || settings.defaultProjectPath,
         }),
       });
@@ -403,7 +451,11 @@ export default function MuacApp() {
       const createRes = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: text.slice(0, 30), modelId: activeModelId }),
+        body: JSON.stringify({
+          title: text.slice(0, 30),
+          modelId: activeModelId,
+          reasoningEffort: activeReasoningEffort,
+        }),
       });
       const createData = await createRes.json();
       if (!createData.success || !createData.conversation) {
@@ -425,11 +477,13 @@ export default function MuacApp() {
       content: text,
       createdAt: new Date().toISOString(),
       modelId: activeModelId,
+      reasoningEffort: activeReasoningEffort,
     };
     setMessages((prev) => [...prev, tempUserMsg]);
 
     setIsStreaming(true);
     setStreamingDelta('');
+    setActivities([]);
     setRotationNotice(null);
     setVerificationAlert(null);
 
@@ -441,6 +495,7 @@ export default function MuacApp() {
           conversationId: targetConvoId,
           prompt: text,
           modelId: activeModelId,
+          reasoningEffort: activeReasoningEffort,
           accountId: activeAccountId,
           projectPath: activeProjectPath,
         }),
@@ -471,7 +526,20 @@ export default function MuacApp() {
           try {
             const event = JSON.parse(jsonStr);
 
-            if (event.type === 'delta' && event.text) {
+            if (event.type === 'activity' && event.activity) {
+              setActivities((prev) => {
+                const act = event.activity;
+                const idx = prev.findIndex(
+                  (a) => a.stepIndex === act.stepIndex && a.stepType === act.stepType
+                );
+                if (idx >= 0) {
+                  const next = [...prev];
+                  next[idx] = { ...next[idx], ...act };
+                  return next;
+                }
+                return [...prev, act];
+              });
+            } else if (event.type === 'delta' && event.text) {
               fullAssistantText += event.text;
               setStreamingDelta(fullAssistantText);
             } else if (event.type === 'rotated' && event.rotationInfo) {
@@ -555,7 +623,10 @@ export default function MuacApp() {
       <ChatCanvas
         messages={messages}
         activeModelId={activeModelId}
-        onSelectModel={(mId) => setActiveModelId(mId)}
+        onSelectModel={handleSelectModel}
+        activeReasoningEffort={activeReasoningEffort}
+        onSelectReasoningEffort={handleSelectReasoningEffort}
+        activities={activities}
         accounts={accounts}
         activeAccountId={activeAccountId}
         onSelectAccount={handleSelectAccount}

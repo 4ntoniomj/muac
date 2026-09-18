@@ -24,7 +24,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params;
     const body = await req.json();
-    const { title, projectPath, isPinned } = body;
+    const { title, projectPath, isPinned, modelId, reasoningEffort } = body;
 
     if (title) {
       updateConversationTitle(id, title);
@@ -36,6 +36,17 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (isPinned !== undefined) {
       const { togglePinConversation } = await import('@/chat/chat-store');
       togglePinConversation(id, Boolean(isPinned));
+    }
+    if (modelId !== undefined || reasoningEffort !== undefined) {
+      const { updateConversationModelAndEffort } = await import('@/chat/chat-store');
+      const current = getConversation(id);
+      if (current) {
+        updateConversationModelAndEffort(
+          id,
+          modelId || current.modelId,
+          reasoningEffort || current.reasoningEffort
+        );
+      }
     }
 
     const updated = getConversation(id);

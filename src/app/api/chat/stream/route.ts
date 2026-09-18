@@ -8,7 +8,7 @@ import type { Message } from '@/shared/types/chat';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { conversationId, prompt, modelId, accountId, projectPath } = body;
+    const { conversationId, prompt, modelId, accountId, projectPath, reasoningEffort } = body;
 
     if (!conversationId || !prompt) {
       return NextResponse.json(
@@ -23,6 +23,15 @@ export async function POST(req: Request) {
         { success: false, error: 'Conversación no encontrada' },
         { status: 404 }
       );
+    }
+
+    const effectiveModelId = modelId || convo.modelId;
+    const effectiveReasoningEffort = reasoningEffort || convo.reasoningEffort || 'high';
+
+    // Persistir modelId y reasoningEffort en la conversación activa
+    if (effectiveModelId !== convo.modelId || effectiveReasoningEffort !== convo.reasoningEffort) {
+      const { updateConversationModelAndEffort } = await import('@/chat/chat-store');
+      updateConversationModelAndEffort(conversationId, effectiveModelId, effectiveReasoningEffort);
     }
 
     // Si viene projectPath en el request y no en la convo, guardarlo
@@ -46,7 +55,8 @@ export async function POST(req: Request) {
       createdAt: new Date().toISOString(),
       accountId: effectiveSenderAcc?.id,
       accountEmail: effectiveSenderAcc?.email,
-      modelId: modelId || convo.modelId,
+      modelId: effectiveModelId,
+      reasoningEffort: effectiveReasoningEffort,
     };
     saveMessage(userMsg);
 
@@ -69,10 +79,13 @@ export async function POST(req: Request) {
         try {
           for await (const event of streamPromptWithAgy(
             prompt,
-            modelId || convo.modelId,
+            effectiveModelId,
             conversationId,
             accountId,
-            { projectPath: effectiveProjectPath }
+            {
+              projectPath: effectiveProjectPath,
+              reasoningEffort: effectiveReasoningEffort,
+            }
           )) {
             if (event.type === 'delta' && event.text) {
               assistantContent += event.text;
@@ -103,7 +116,8 @@ export async function POST(req: Request) {
               usage: finalUsage,
               accountId: responderAccountId,
               accountEmail: responderAccountEmail,
-              modelId: modelId || convo.modelId,
+              modelId: effectiveModelId,
+              reasoningEffort: effectiveReasoningEffort,
             };
             saveMessage(assistantMsg);
           }

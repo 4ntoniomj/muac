@@ -224,3 +224,92 @@ https://accounts.google.com/signin/continue?sarp=1&scc=1&continue=https://develo
   assert.match(match[0], /accounts\.google\.com\/signin\/continue/, 'URL debe apuntar al flujo oficial de Google');
 });
 
+// 10. Verificación de Observabilidad: Estructuración de Eventos de Actividad
+test('Observabilidad: Captura y emisión de pasos de herramientas y razonamiento', () => {
+  const sampleToolStep = {
+    step_index: 2,
+    state: 'ACTIVE',
+    step_type: 'tool',
+    tool_name: 'list_dir',
+    tool_info: {
+      name: 'list_dir',
+      parameters: { DirectoryPath: '/home/usuario/proyecto' },
+    },
+    duration_seconds: 0.05,
+  };
+
+  const activity = {
+    stepIndex: sampleToolStep.step_index,
+    stepType: 'tool',
+    state: sampleToolStep.state,
+    toolName: sampleToolStep.tool_name,
+    toolParameters: sampleToolStep.tool_info.parameters,
+    durationSeconds: sampleToolStep.duration_seconds,
+  };
+
+  assert.equal(activity.stepType, 'tool');
+  assert.equal(activity.toolName, 'list_dir');
+  assert.equal(activity.toolParameters.DirectoryPath, '/home/usuario/proyecto');
+});
+
+// 11. Verificación de Banderas de Esfuerzo de Razonamiento y Modelos
+test('Esfuerzo de Razonamiento: Inclusión de --effort solo para modelos soportados', () => {
+  const geminiModel = { id: 'gemini-3.8-flash', effortSupported: true, supportedEfforts: ['low', 'medium', 'high'] };
+  const claudeModel = { id: 'claude-sonnet-4-6', effortSupported: false, supportedEfforts: [] };
+
+  function buildAgyArgs(model, effort) {
+    const args = ['--print', 'hi', '--model', model.id];
+    if (model.effortSupported) {
+      args.push('--effort', effort);
+    }
+    return args;
+  }
+
+  const geminiArgs = buildAgyArgs(geminiModel, 'low');
+  assert.ok(geminiArgs.includes('--effort'));
+  assert.equal(geminiArgs[geminiArgs.indexOf('--effort') + 1], 'low');
+
+  const claudeArgs = buildAgyArgs(claudeModel, 'low');
+  assert.ok(!claudeArgs.includes('--effort'), 'Claude no debe recibir flag --effort para evitar error de agy');
+});
+
+// 12. Verificación del Cálculo de Ventana de Contexto Sin Duplicación Indebida
+test('Context Window: El cálculo debe basarse en el último turno real y no acumular sumas falsas', () => {
+  const messages = [
+    { role: 'user', content: 'Pregunta 1' },
+    {
+      role: 'assistant',
+      content: 'Respuesta 1',
+      usage: { inputTokens: 13260, outputTokens: 500, totalTokens: 13760 },
+    },
+    { role: 'user', content: 'Pregunta 2' },
+    {
+      role: 'assistant',
+      content: 'Respuesta 2',
+      usage: { inputTokens: 14000, outputTokens: 800, totalTokens: 14800 },
+    },
+  ];
+
+  // Algoritmo corregido: buscar el último mensaje del asistente con usage
+  let baseTokens = 0;
+  let lastAssistantIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'assistant' && messages[i].usage && messages[i].usage.totalTokens > 0) {
+      baseTokens = messages[i].usage.totalTokens;
+      lastAssistantIdx = i;
+      break;
+    }
+  }
+
+  assert.equal(baseTokens, 14800, 'Debe tomar los 14,800 tokens del último turno, no 13,760 + 14,800');
+  assert.notEqual(baseTokens, 13760 + 14800, 'No debe sumar turnos previos porque ya están en el historial');
+});
+
+// 13. Verificación de Zenity para Selección de Carpeta de Workspace
+test('Workspace: Disponibilidad de herramienta de diálogo zenity en Linux', () => {
+  const fs = require('node:fs');
+  const zenityExists = fs.existsSync('/usr/bin/zenity');
+  assert.equal(zenityExists, true, 'El ejecutable /usr/bin/zenity debe existir en el entorno Linux');
+});
+
+

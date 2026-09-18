@@ -53,7 +53,8 @@ function initDatabaseSchema(db: DatabaseSync): void {
       model_id TEXT NOT NULL,
       total_tokens INTEGER NOT NULL DEFAULT 0,
       project_path TEXT,
-      is_pinned INTEGER NOT NULL DEFAULT 0
+      is_pinned INTEGER NOT NULL DEFAULT 0,
+      reasoning_effort TEXT NOT NULL DEFAULT 'high'
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -104,6 +105,11 @@ function initDatabaseSchema(db: DatabaseSync): void {
   }
   try {
     db.exec('ALTER TABLE conversations ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;');
+  } catch {
+    // La columna ya existe
+  }
+  try {
+    db.exec("ALTER TABLE conversations ADD COLUMN reasoning_effort TEXT NOT NULL DEFAULT 'high';");
   } catch {
     // La columna ya existe
   }

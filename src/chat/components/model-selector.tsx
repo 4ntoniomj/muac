@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { ANTIGRAVITY_MODELS, AntigravityModel } from '@/shared/types/model';
-import { ChevronDown, Sparkles, Cpu, Check } from 'lucide-react';
+import { ANTIGRAVITY_MODELS, AntigravityModel, findModel } from '@/shared/types/model';
+import { ChevronDown, Sparkles, Cpu, Check, Sliders } from 'lucide-react';
 
 interface ModelSelectorProps {
   selectedModelId: string;
@@ -13,8 +13,7 @@ export function ModelSelector({ selectedModelId, onSelectModel }: ModelSelectorP
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  const activeModel =
-    ANTIGRAVITY_MODELS.find((m) => m.id === selectedModelId) || ANTIGRAVITY_MODELS[0];
+  const activeModel = findModel(selectedModelId);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
