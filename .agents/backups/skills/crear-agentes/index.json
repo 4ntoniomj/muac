@@ -1,0 +1,18 @@
+[
+  {
+    "id": "20260918T16532812Z",
+    "file": "/IA/.agents/backups/skills/crear-agentes/20260918T16532812Z.tar.gz",
+    "sha256": "f6804ab4791b590e9571ae9038a827598746bce38ed3f27d62962039307b385f",
+    "files": 16,
+    "reason": "tabla de skills en el AGENTS.md de dominio",
+    "source": "/IA/.agents/skills/crear-agentes"
+  },
+  {
+    "id": "20260918T18383467Z",
+    "file": "/IA/.agents/backups/skills/crear-agentes/20260918T18383467Z.tar.gz",
+    "sha256": "aadb3bb82cd6259130ab4350f775ff59455edbd282cf35d715592a42de4e20d0",
+    "files": 16,
+    "reason": "subir presupuesto del raiz y permitir emojis y separadores",
+    "source": "/IA/.agents/skills/crear-agentes"
+  }
+]

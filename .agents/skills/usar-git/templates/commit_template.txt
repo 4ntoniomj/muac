@@ -1,0 +1,20 @@
+# <tipo>(<ámbito opcional>): <descripción concisa en presente/imperativo>
+#
+# Tipos permitidos:
+#   feat:     Nueva funcionalidad para el usuario
+#   fix:      Corrección de un bug
+#   docs:     Cambios únicamente en documentación
+#   style:    Formato, espacios, comas (sin cambios en lógica)
+#   refactor: Refactorización de código sin arreglar bug ni añadir feature
+#   test:     Añadir o corregir tests existentes
+#   chore:    Tareas de mantenimiento, dependencias o configuración
+#
+# Reglas:
+#   - Primera línea: máximo 50-72 caracteres, en minúsculas tras el tipo
+#   - Sin punto final en el título
+#   - Si se requiere cuerpo explicativo, separar con una línea en blanco
+#
+# Ejemplos:
+#   feat(auth): agregar soporte para login con OAuth2
+#   fix(carrito): corregir calculo de impuestos en checkout
+#   docs(readme): actualizar instrucciones de instalacion local

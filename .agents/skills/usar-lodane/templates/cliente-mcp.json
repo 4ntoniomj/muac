@@ -1,0 +1,22 @@
+{
+  "_comentario": "Plantilla de configuración de un cliente MCP para lodane. Los nombres de los campos de configuración varían entre clientes: comprueba los del tuyo en su documentación. Lo que no varía es el binario, el subcomando y, en la vía HTTP, la ruta y la cabecera.",
+  "mcpServers": {
+    "lodane-stdio": {
+      "_cuando": "Uso local, sin red y sin token: el cliente arranca el binario.",
+      "command": "lodane",
+      "args": ["stdio"],
+      "env": {
+        "LODANE_BASE_DATOS": "",
+        "_nota": "Vacío deja la ruta por defecto del sistema operativo."
+      }
+    },
+    "lodane-http": {
+      "_cuando": "Servidor único en 127.0.0.1: todas las carpetas y dispositivos hablan con él.",
+      "type": "http",
+      "url": "http://127.0.0.1:7437/mcp",
+      "headers": {
+        "Authorization": "Bearer PON_AQUI_TU_TOKEN"
+      }
+    }
+  }
+}

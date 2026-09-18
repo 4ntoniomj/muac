@@ -1,0 +1,76 @@
+{
+  "skill": "mejorar-skills",
+  "version": "2.0.0",
+  "cases": [
+    {
+      "id": "pos_01",
+      "type": "positive",
+      "prompt": "La skill react-desktop-ui propone npm y yo uso pnpm; a partir de ahora que use pnpm.",
+      "expected_activation": true,
+      "rationale": "Contradicción permanente con una regla de una skill existente."
+    },
+    {
+      "id": "pos_02",
+      "type": "positive",
+      "prompt": "La skill de migraciones se activa cada vez que pregunto por consultas SELECT; corrígela.",
+      "expected_activation": true,
+      "rationale": "Falso positivo de enrutamiento en una skill del catálogo."
+    },
+    {
+      "id": "pos_03",
+      "type": "positive",
+      "prompt": "Audita la skill tauri-rust-desktop y refactorízala: tiene demasiada teoría y comandos viejos.",
+      "expected_activation": true,
+      "rationale": "Auditoría y refactorización de una skill existente."
+    },
+    {
+      "id": "pos_04",
+      "type": "positive",
+      "prompt": "Más adelante quiero que la skill paginas-web genere también historias de Storybook; apúntalo en la skill.",
+      "expected_activation": true,
+      "rationale": "Mejora futura que debe quedar en el backlog de la skill."
+    },
+    {
+      "id": "pos_05",
+      "type": "positive",
+      "prompt": "No me gusta cómo trabaja la skill de pentesting: quiero que añada siempre la severidad CVSS a cada hallazgo.",
+      "expected_activation": true,
+      "rationale": "Ampliación compatible y permanente de una skill existente."
+    },
+    {
+      "id": "neg_01",
+      "type": "negative",
+      "prompt": "Crea una skill nueva para generar migraciones de Alembic.",
+      "expected_activation": false,
+      "rationale": "Skill nueva: corresponde a crear-skills."
+    },
+    {
+      "id": "neg_02",
+      "type": "negative",
+      "prompt": "Busca en skills.sh una skill de Terraform e impórtala al catálogo.",
+      "expected_activation": false,
+      "rationale": "Búsqueda e importación de una skill nueva: crear-skills."
+    },
+    {
+      "id": "neg_03",
+      "type": "negative",
+      "prompt": "Genera los AGENTS.md del repositorio para el orquestador y los subagentes.",
+      "expected_activation": false,
+      "rationale": "Reglas de agentes: crear-agentes."
+    },
+    {
+      "id": "neg_04",
+      "type": "negative",
+      "prompt": "Refactoriza el componente ContextRing.tsx para separar la lógica del SVG.",
+      "expected_activation": false,
+      "rationale": "Refactorización de código del producto, no de una skill."
+    },
+    {
+      "id": "neg_05",
+      "type": "negative",
+      "prompt": "Actualiza las dependencias de package.json a sus últimas versiones compatibles.",
+      "expected_activation": false,
+      "rationale": "Mantenimiento de dependencias del proyecto, no de una skill."
+    }
+  ]
+}

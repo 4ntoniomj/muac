@@ -1,0 +1,76 @@
+{
+  "skill": "crear-skills",
+  "version": "2.0.0",
+  "cases": [
+    {
+      "id": "pos_01",
+      "type": "positive",
+      "prompt": "Quiero una skill para crear páginas web que usen buenas prácticas de diseño.",
+      "expected_activation": true,
+      "rationale": "Petición directa de crear una skill nueva para un dominio."
+    },
+    {
+      "id": "pos_02",
+      "type": "positive",
+      "prompt": "Busca en skills.sh la mejor skill de Terraform, adáptala al español e instálala en el catálogo.",
+      "expected_activation": true,
+      "rationale": "Búsqueda remota, adaptación e importación de una skill."
+    },
+    {
+      "id": "pos_03",
+      "type": "positive",
+      "prompt": "Convierte este runbook de despliegue con Docker en una skill con scripts y evals.",
+      "expected_activation": true,
+      "rationale": "Empaquetar un procedimiento existente como skill nueva."
+    },
+    {
+      "id": "pos_04",
+      "type": "positive",
+      "prompt": "Necesito diseñar una skill que genere informes de cobertura de pytest; no sé qué estructura darle.",
+      "expected_activation": true,
+      "rationale": "Diseño de skill nueva con dudas de estructura (plantilla script-wrapper)."
+    },
+    {
+      "id": "pos_05",
+      "type": "positive",
+      "prompt": "Importa la skill frontend-design de anthropics y hazla nuestra con preguntas previas al usuario.",
+      "expected_activation": true,
+      "rationale": "Importación y adaptación de una skill de terceros."
+    },
+    {
+      "id": "neg_01",
+      "type": "negative",
+      "prompt": "La skill react-desktop-ui sigue usando npm y yo quiero pnpm; corrígela.",
+      "expected_activation": false,
+      "rationale": "Corrección de una skill existente: corresponde a mejorar-skills."
+    },
+    {
+      "id": "neg_02",
+      "type": "negative",
+      "prompt": "La skill de migraciones se activa cuando pregunto por consultas SQL normales; arregla su description.",
+      "expected_activation": false,
+      "rationale": "Falso positivo en una skill existente: corresponde a mejorar-skills."
+    },
+    {
+      "id": "neg_03",
+      "type": "negative",
+      "prompt": "Genera el AGENTS.md raíz y los de cada subcarpeta para este monorepo.",
+      "expected_activation": false,
+      "rationale": "Reglas de agentes por carpeta: corresponde a crear-agentes."
+    },
+    {
+      "id": "neg_04",
+      "type": "negative",
+      "prompt": "Haz una landing page para mi academia con Astro y Tailwind.",
+      "expected_activation": false,
+      "rationale": "Ejecutar la tarea del dominio, no crear una skill."
+    },
+    {
+      "id": "neg_05",
+      "type": "negative",
+      "prompt": "Audita la skill tauri-rust-desktop y dime qué secciones le faltan.",
+      "expected_activation": false,
+      "rationale": "Auditoría de una skill existente: corresponde a mejorar-skills."
+    }
+  ]
+}

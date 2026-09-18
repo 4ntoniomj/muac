@@ -1,0 +1,26 @@
+# Entorno y secretos
+.env
+.env*.local
+
+# Dependencias
+node_modules/
+
+# Compilación y builds
+.next/
+out/
+build/
+dist/
+
+# Datos locales persistentes
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/*.db-journal
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+*.pem

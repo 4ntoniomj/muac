@@ -1,0 +1,76 @@
+{
+  "skill": "crear-agentes",
+  "version": "2.0.0",
+  "cases": [
+    {
+      "id": "pos_01",
+      "type": "positive",
+      "prompt": "Crea el AGENTS.md orquestador en la raíz de este repo y un AGENTS.md por cada subcarpeta para los subagentes.",
+      "expected_activation": true,
+      "rationale": "Petición literal del flujo principal."
+    },
+    {
+      "id": "pos_02",
+      "type": "positive",
+      "prompt": "Configura los agentes de este monorepo: frontend en web/, API en api/ y cada uno con sus skills.",
+      "expected_activation": true,
+      "rationale": "Reparto por carpetas con subagentes y skills."
+    },
+    {
+      "id": "pos_03",
+      "type": "positive",
+      "prompt": "Mi CLAUDE.md tiene 300 líneas y consume demasiado contexto; reorganízalo en reglas por carpeta.",
+      "expected_activation": true,
+      "rationale": "Reorganizar archivos de reglas con presupuesto de contexto."
+    },
+    {
+      "id": "pos_04",
+      "type": "positive",
+      "prompt": "Revisa si los AGENTS.md del proyecto cumplen el presupuesto de tokens y cubren seguridad y verificación.",
+      "expected_activation": true,
+      "rationale": "Auditoría de AGENTS.md."
+    },
+    {
+      "id": "pos_05",
+      "type": "positive",
+      "prompt": "Empiezo un proyecto nuevo de análisis de datos en Python; prepara las reglas de agentes antes de programar.",
+      "expected_activation": true,
+      "rationale": "Proyecto nuevo: AGENTS.md antes del código."
+    },
+    {
+      "id": "neg_01",
+      "type": "negative",
+      "prompt": "Crea una skill para escribir migraciones de Alembic con verificación de sentencias destructivas.",
+      "expected_activation": false,
+      "rationale": "Crear una skill: corresponde a crear-skills."
+    },
+    {
+      "id": "neg_02",
+      "type": "negative",
+      "prompt": "La skill tauri-rust-desktop sigue usando unwrap; cambia esa regla.",
+      "expected_activation": false,
+      "rationale": "Modificar una skill existente: corresponde a mejorar-skills."
+    },
+    {
+      "id": "neg_03",
+      "type": "negative",
+      "prompt": "Implementa el endpoint de login en api/ siguiendo la spec 02.",
+      "expected_activation": false,
+      "rationale": "Ejecución de código del producto, no configuración de agentes."
+    },
+    {
+      "id": "neg_04",
+      "type": "negative",
+      "prompt": "Escribe la especificación funcional del módulo de pagos con sus criterios de aceptación.",
+      "expected_activation": false,
+      "rationale": "Especificación de producto, no reglas de agentes."
+    },
+    {
+      "id": "neg_05",
+      "type": "negative",
+      "prompt": "Añade un hook de Claude Code que ejecute el linter después de cada edición.",
+      "expected_activation": false,
+      "rationale": "Configuración de hooks de la herramienta, no AGENTS.md."
+    }
+  ]
+}

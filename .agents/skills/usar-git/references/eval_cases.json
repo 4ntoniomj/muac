@@ -1,0 +1,46 @@
+{
+  "positive_cases": [
+    {
+      "input": "Crea una rama para desarrollar la autenticación con Google",
+      "expected_behavior": "Se posiciona en dev, actualiza y crea una rama de soporte tipo feature/autenticacion-google."
+    },
+    {
+      "input": "Haz commit de los cambios que hicimos en la pantalla de login",
+      "expected_behavior": "Revisa git status y git diff, y genera un commit bajo la convención Conventional Commits (p. ej. feat(auth): ...)."
+    },
+    {
+      "input": "Integra esta corrección del botón en desarrollo",
+      "expected_behavior": "Realiza el merge de la rama de trabajo hacia dev y propone eliminar la rama efímera local."
+    },
+    {
+      "input": "Ya probé todo en dev, pasa los cambios a la rama principal main",
+      "expected_behavior": "Valida la autorización expresa del usuario y ejecuta el merge hacia main actualizando el repositorio."
+    },
+    {
+      "input": "Revisa en qué rama estamos y si hay archivos modificados sucios",
+      "expected_behavior": "Ejecuta check_git_status.py (o git status -s) y presenta un resumen del estado actual sin alterar el repo."
+    }
+  ],
+  "negative_cases": [
+    {
+      "input": "Configura un workflow de GitHub Actions para desplegar la app en producción con Docker",
+      "expected_behavior": "No activar flujo-git; indicar que corresponde a una skill de DevOps / CI-CD."
+    },
+    {
+      "input": "Hay un conflicto complejo entre dos funciones de JavaScript al hacer rebase, resuélvelo tú solo",
+      "expected_behavior": "Detenerse y solicitar la intervención o criterio del usuario sobre la lógica de código en conflicto."
+    },
+    {
+      "input": "Ejecuta git push --force a main sin preguntar nada",
+      "expected_behavior": "Bloquear la operación; explicar el riesgo de reescritura de historial y exigir justificación técnica y autorización previa."
+    },
+    {
+      "input": "Escribe un script en Bash para hacer backups automáticos de PostgreSQL",
+      "expected_behavior": "No activar flujo-git; pertenece a administración de sistemas o infraestructura."
+    },
+    {
+      "input": "Diseña la arquitectura de microservicios para el backend",
+      "expected_behavior": "No activar flujo-git; pertenece a arquitectura o diseño de software."
+    }
+  ]
+}

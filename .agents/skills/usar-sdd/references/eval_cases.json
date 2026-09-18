@@ -1,0 +1,76 @@
+{
+  "skill": "usar-sdd",
+  "version": "1.0.0",
+  "cases": [
+    {
+      "id": "pos_01",
+      "type": "positive",
+      "prompt": "Inicia el ciclo de desarrollo SDD para crear el sistema de autenticación con OpenSpec",
+      "expected_activation": true,
+      "rationale": "Petición explícita para iniciar el ciclo SDD completo con OpenSpec."
+    },
+    {
+      "id": "pos_02",
+      "type": "positive",
+      "prompt": "Quiero orquestar una nueva feature usando Spec-Driven Development dividiendo el trabajo en subagentes",
+      "expected_activation": true,
+      "rationale": "Solicita orquestar una funcionalidad con SDD y reparto en subagentes."
+    },
+    {
+      "id": "pos_03",
+      "type": "positive",
+      "prompt": "Coordina el flujo completo de SDD con OpenSpec para la funcionalidad de pagos: exploración, propuesta, aprobación y tareas",
+      "expected_activation": true,
+      "rationale": "Menciona el ciclo completo de SDD (exploración, propuesta, gate, tareas) con OpenSpec."
+    },
+    {
+      "id": "pos_04",
+      "type": "positive",
+      "prompt": "Aplica el ciclo de vida SDD con subagentes especializados para refactorizar la capa de base de datos",
+      "expected_activation": true,
+      "rationale": "Petición para aplicar el ciclo de vida SDD delegando en subagentes especializados."
+    },
+    {
+      "id": "pos_05",
+      "type": "positive",
+      "prompt": "Ejecuta un flujo guiado por especificaciones con OpenSpec respetando las 4 fases de SDD y el human gate",
+      "expected_activation": true,
+      "rationale": "Solicita desarrollo guiado por especificaciones con las 4 fases de SDD y el Human Gate."
+    },
+    {
+      "id": "neg_01",
+      "type": "negative",
+      "prompt": "Solo quiero pensar y explorar libremente ideas sobre el modelo de datos antes de definir nada formal en OpenSpec",
+      "expected_activation": false,
+      "rationale": "Petición de exploración conceptual aislada que corresponde a openspec-explore."
+    },
+    {
+      "id": "neg_02",
+      "type": "negative",
+      "prompt": "Genera directamente la propuesta y el cambio add-user-auth en un solo paso con openspec propose",
+      "expected_activation": false,
+      "rationale": "Solicita la generación directa de artefactos en un paso con openspec-propose sin orquestación de ciclo completo."
+    },
+    {
+      "id": "neg_03",
+      "type": "negative",
+      "prompt": "Aplica los cambios e implementa las tareas pendientes del cambio api-rate-limiting con openspec apply",
+      "expected_activation": false,
+      "rationale": "Petición directa para implementar tareas de un cambio existente que corresponde a openspec-apply-change."
+    },
+    {
+      "id": "neg_04",
+      "type": "negative",
+      "prompt": "Archiva el cambio completado api-rate-limiting tras haber terminado todas las tareas con openspec archive",
+      "expected_activation": false,
+      "rationale": "Petición directa de archivo que corresponde a openspec-archive-change."
+    },
+    {
+      "id": "neg_05",
+      "type": "negative",
+      "prompt": "Crea un archivo AGENTS.md para configurar el orquestador y los subagentes del proyecto",
+      "expected_activation": false,
+      "rationale": "Petición de generación de configuración de agentes que corresponde a crear-agentes."
+    }
+  ]
+}
