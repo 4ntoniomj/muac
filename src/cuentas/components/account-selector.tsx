@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import type { AccountWithQuota } from '@/shared/types/account';
-import { User, ChevronDown, Check, Plus, RefreshCw, Zap } from 'lucide-react';
+import { User, ChevronDown, Check, Plus, RefreshCw, Zap, ExternalLink } from 'lucide-react';
 
 interface AccountSelectorProps {
   accounts: AccountWithQuota[];
@@ -134,7 +134,17 @@ export function AccountSelector({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <a
+                    href={`/api/auth/verify?accountId=${acc.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="p-1 rounded text-slate-400 hover:text-blue-300 hover:bg-slate-700/60 transition-all"
+                    title="Abrir verificación oficial de Google en una pestaña nueva"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
                   {isSelected && <Check className="w-4 h-4 text-blue-400" />}
                 </div>
               </button>

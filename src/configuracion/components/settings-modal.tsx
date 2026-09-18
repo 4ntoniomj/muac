@@ -451,20 +451,16 @@ export function SettingsModal({
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => handleVerifyAccount(acc.id)}
-                        disabled={verifyingAccountId === acc.id}
+                      <a
+                        href={`/api/auth/verify?accountId=${acc.id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-[11px] font-medium transition-all"
-                        title="Verificar o activar cuenta en Google en una pestaña nueva"
+                        title="Abrir activación en Google en una pestaña nueva"
                       >
-                        {verifyingAccountId === acc.id ? (
-                          <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
-                        ) : (
-                          <ExternalLink className="w-3 h-3 text-blue-400" />
-                        )}
-                        <span>Activar en Google</span>
-                      </button>
+                        <ExternalLink className="w-3 h-3 text-blue-400" />
+                        <span>Activar en Google ↗</span>
+                      </a>
 
                       {!acc.isActive && (
                         <button
