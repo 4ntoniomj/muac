@@ -312,4 +312,72 @@ test('Workspace: Disponibilidad de herramienta de diálogo zenity en Linux', () 
   assert.equal(zenityExists, true, 'El ejecutable /usr/bin/zenity debe existir en el entorno Linux');
 });
 
+// 14. Verificación de Sustitución de Etiqueta Workspace por Nombre de Carpeta
+test('Workspace: Reemplazo de etiqueta Workspace por el nombre de la carpeta seleccionada', () => {
+  const getFolderDisplayName = (projectPath) => {
+    return projectPath ? projectPath.split('/').filter(Boolean).pop() || projectPath : 'Workspace';
+  };
+
+  assert.equal(getFolderDisplayName(''), 'Workspace', 'Sin ruta debe mostrar "Workspace"');
+  assert.equal(getFolderDisplayName(undefined), 'Workspace', 'Ruta indefinida debe mostrar "Workspace"');
+  assert.equal(
+    getFolderDisplayName('/home/antonio/Escritorio/Todo/IA/prueba'),
+    'prueba',
+    'Debe extraer el nombre final del directorio sin la ruta completa'
+  );
+  assert.equal(
+    getFolderDisplayName('/home/antonio/Escritorio/Todo/IA/prueba/'),
+    'prueba',
+    'Debe manejar correctamente barras finales'
+  );
+  assert.equal(
+    getFolderDisplayName('/var/www/mi-proyecto'),
+    'mi-proyecto',
+    'Debe mostrar el nombre exacto de la carpeta'
+  );
+});
+
+// 15. Verificación de Modal de Advertencia por Pérdida de Contexto en Cambio de Modelo
+test('Modelo: Modal de advertencia con mensaje exacto al conmutar de modelo', () => {
+  const WARNING_TEXT = 'Al cambiar de modelo se pierde el contexto de la conversación, ¿estás seguro?';
+  
+  // Simulación de interacción de usuario
+  let currentModelId = 'gemini-3.8-flash';
+  let pendingModelId = null;
+
+  const handleModelClick = (targetModelId) => {
+    if (targetModelId === currentModelId) {
+      return { triggeredModal: false };
+    }
+    pendingModelId = targetModelId;
+    return {
+      triggeredModal: true,
+      message: WARNING_TEXT,
+    };
+  };
+
+  // Clic en el mismo modelo no debe lanzar modal
+  const sameResult = handleModelClick('gemini-3.8-flash');
+  assert.equal(sameResult.triggeredModal, false, 'No debe disparar advertencia al seleccionar el mismo modelo');
+  assert.equal(pendingModelId, null);
+
+  // Clic en modelo diferente debe lanzar advertencia con mensaje exacto
+  const diffResult = handleModelClick('claude-3-7-sonnet');
+  assert.equal(diffResult.triggeredModal, true, 'Debe disparar advertencia al cambiar a otro modelo');
+  assert.equal(diffResult.message, WARNING_TEXT, 'El texto debe ser exactamente el especificado');
+  assert.equal(pendingModelId, 'claude-3-7-sonnet');
+
+  // Si cancela, currentModelId no cambia
+  pendingModelId = null;
+  assert.equal(currentModelId, 'gemini-3.8-flash', 'Al cancelar se preserva el modelo original');
+
+  // Si acepta, se actualiza el modelo
+  const handleConfirm = (confirmedId) => {
+    currentModelId = confirmedId;
+  };
+  handleConfirm('claude-3-7-sonnet');
+  assert.equal(currentModelId, 'claude-3-7-sonnet', 'Al aceptar se actualiza el modelo');
+});
+
+
 

@@ -128,9 +128,7 @@ export default function MuacApp() {
         setConversations(data.conversations || []);
         if (data.conversations && data.conversations.length > 0 && !activeConversationId) {
           setActiveConversationId(data.conversations[0].id);
-          if (data.conversations[0].projectPath) {
-            setActiveProjectPath(data.conversations[0].projectPath);
-          }
+          setActiveProjectPath(data.conversations[0].projectPath || '');
         }
       }
     } catch (err) {
@@ -151,9 +149,7 @@ export default function MuacApp() {
         if (data.conversation?.reasoningEffort) {
           setActiveReasoningEffort(data.conversation.reasoningEffort);
         }
-        if (data.conversation?.projectPath) {
-          setActiveProjectPath(data.conversation.projectPath);
-        }
+        setActiveProjectPath(data.conversation?.projectPath || '');
       }
     } catch (err) {
       console.error('Error al cargar mensajes:', err);
@@ -455,6 +451,7 @@ export default function MuacApp() {
           title: text.slice(0, 30),
           modelId: activeModelId,
           reasoningEffort: activeReasoningEffort,
+          projectPath: activeProjectPath || settings.defaultProjectPath || undefined,
         }),
       });
       const createData = await createRes.json();
@@ -464,6 +461,9 @@ export default function MuacApp() {
       }
       targetConvoId = createData.conversation.id;
       setActiveConversationId(targetConvoId);
+      if (createData.conversation.projectPath) {
+        setActiveProjectPath(createData.conversation.projectPath);
+      }
       setConversations((prev) => [createData.conversation, ...prev]);
     }
 

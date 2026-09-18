@@ -32,7 +32,9 @@ export function WorkspaceSelector({
       const data = await res.json();
       if (data.success && data.path) {
         setTempPath(data.path);
-        validatePath(data.path);
+        await validatePath(data.path);
+        await onUpdateProjectPath(data.path);
+        setIsOpen(false);
       } else if (data.error) {
         alert(data.error);
       }
@@ -121,7 +123,7 @@ export function WorkspaceSelector({
         title={projectPath ? `Workspace activo: ${projectPath}` : 'Asignar ruta de trabajo local para el agente'}
       >
         <FolderOpen className={`w-3.5 h-3.5 ${projectPath ? 'text-amber-400' : 'text-slate-500'}`} />
-        <span className="max-w-[130px] truncate">{folderDisplayName}</span>
+        <span className="max-w-[160px] truncate">{folderDisplayName}</span>
 
         {projectPath && validation?.valid && (
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" title="Directorio validado" />
