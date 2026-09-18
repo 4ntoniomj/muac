@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import type { StoredToken } from '@/shared/types/account';
 
-export const GOOGLE_CLIENT_ID = 'mock_client_id.apps.googleusercontent.com';
-export const GOOGLE_CLIENT_SECRET = 'mock_client_secret';
+export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
 export const GOOGLE_SCOPES = [
   'openid',
   'https://www.googleapis.com/auth/userinfo.email',
@@ -25,13 +25,18 @@ export function generatePKCE(): PKCEPair {
 }
 
 export function getGoogleAuthUrl(redirectUri: string, verifier: string, state?: string): string {
+  const clientId = process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID;
+  if (!clientId) {
+    throw new Error('Falta configurar GOOGLE_CLIENT_ID en las variables de entorno (.env).');
+  }
+
   const challenge = crypto
     .createHash('sha256')
     .update(verifier)
     .digest('base64url');
 
   const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
+    client_id: clientId,
     redirect_uri: redirectUri,
     response_type: 'code',
     scope: GOOGLE_SCOPES,
@@ -63,9 +68,15 @@ export async function exchangeCodeForTokens(
   codeVerifier: string,
   redirectUri: string
 ): Promise<TokenExchangeResult> {
+  const clientId = process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || GOOGLE_CLIENT_SECRET;
+  if (!clientId || !clientSecret) {
+    throw new Error('Faltan GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET en las variables de entorno (.env).');
+  }
+
   const params = new URLSearchParams({
-    client_id: GOOGLE_CLIENT_ID,
-    client_secret: GOOGLE_CLIENT_SECRET,
+    client_id: clientId,
+    client_secret: clientSecret,
     code,
     code_verifier: codeVerifier,
     grant_type: 'authorization_code',

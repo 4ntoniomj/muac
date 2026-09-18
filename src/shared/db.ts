@@ -4,7 +4,13 @@ import fs from 'node:fs';
 
 const DB_DIR = path.resolve(process.cwd(), 'data');
 if (!fs.existsSync(DB_DIR)) {
-  fs.mkdirSync(DB_DIR, { recursive: true });
+  fs.mkdirSync(DB_DIR, { recursive: true, mode: 0o700 });
+} else {
+  try {
+    fs.chmodSync(DB_DIR, 0o700);
+  } catch {
+    // Ignorar en entornos sin soporte de permisos POSIX
+  }
 }
 
 const DB_PATH = path.join(DB_DIR, 'muac.db');
@@ -14,6 +20,25 @@ let _db: DatabaseSync | null = null;
 export function getDatabase(): DatabaseSync {
   if (!_db) {
     _db = new DatabaseSync(DB_PATH);
+
+    // Asegurar permisos estrictos 0600 para almacenamiento sensible
+    try {
+      if (fs.existsSync(DB_PATH)) {
+        fs.chmodSync(DB_PATH, 0o600);
+      }
+    } catch {
+      // Ignorar en Windows / no-POSIX
+    }
+
+    try {
+      const envPath = path.resolve(process.cwd(), '.env');
+      if (fs.existsSync(envPath)) {
+        fs.chmodSync(envPath, 0o600);
+      }
+    } catch {
+      // Ignorar en Windows / no-POSIX
+    }
+
     initDatabaseSchema(_db);
   }
   return _db;

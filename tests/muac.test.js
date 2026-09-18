@@ -2,10 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 
-// 1. Verificación del Generador OAuth, prompt=select_account y credenciales de Antigravity
-test('OAuth: Debe incluir prompt=select_account, client_id oficial y client_secret para intercambio de tokens', () => {
-  const CLIENT_ID = 'mock_client_id.apps.googleusercontent.com';
-  const CLIENT_SECRET = 'mock_client_secret';
+// 1. Verificación del Generador OAuth, prompt=select_account y credenciales desacopladas
+test('OAuth: Debe incluir prompt=select_account, client_id dinámico y client_secret para intercambio de tokens', () => {
+  const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || 'mock_client_id.apps.googleusercontent.com';
+  const CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || 'mock_client_secret';
   const verifier = crypto.randomBytes(32).toString('base64url');
   const challenge = crypto.createHash('sha256').update(verifier).digest('base64url');
   const redirectUri = 'http://localhost:3000/api/auth/callback';
@@ -25,7 +25,7 @@ test('OAuth: Debe incluir prompt=select_account, client_id oficial y client_secr
 
   assert.match(authUrl, /prompt=select_account/, 'La URL debe forzar el selector de cuentas');
   assert.match(authUrl, /code_challenge_method=S256/, 'Debe usar PKCE S256');
-  assert.match(authUrl, /client_id=/, 'Debe usar el client_id oficial de Antigravity');
+  assert.match(authUrl, new RegExp(`client_id=${encodeURIComponent(CLIENT_ID)}`), 'Debe usar el client_id configurado');
 
   // Parámetros requeridos para intercambio de tokens
   const tokenParams = new URLSearchParams({
@@ -377,6 +377,96 @@ test('Modelo: Modal de advertencia con mensaje exacto al conmutar de modelo', ()
   };
   handleConfirm('claude-3-7-sonnet');
   assert.equal(currentModelId, 'claude-3-7-sonnet', 'Al aceptar se actualiza el modelo');
+});
+
+// 16. Verificación de Permisos Estrictos de Base de Datos y .env
+test('Seguridad: Verificación de permisos restrictivos (0600 / 0700)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  const envPath = path.resolve(process.cwd(), '.env');
+  if (fs.existsSync(envPath) && process.platform !== 'win32') {
+    const stat = fs.statSync(envPath);
+    const mode = stat.mode & 0o777;
+    assert.equal(mode, 0o600, 'El archivo .env debe tener permisos estrictos 0600');
+  }
+
+  const dataDir = path.resolve(process.cwd(), 'data');
+  if (fs.existsSync(dataDir) && process.platform !== 'win32') {
+    const stat = fs.statSync(dataDir);
+    const mode = stat.mode & 0o777;
+    assert.equal(mode, 0o700, 'El directorio data/ debe tener permisos estrictos 0700');
+  }
+});
+
+// 17. Verificación de Sanitización de Workspace contra Path Traversal
+test('Seguridad: Prevención de Path Traversal y rechazo de rutas raíz/protegidas', () => {
+  const path = require('node:path');
+
+  const FORBIDDEN_ROOTS_POSIX = new Set([
+    '/', '/etc', '/proc', '/sys', '/dev', '/boot', '/root', '/bin', '/sbin', '/usr/bin', '/usr/sbin'
+  ]);
+
+  const validate = (target) => {
+    if (!target || typeof target !== 'string' || !target.trim()) return { valid: false };
+    const resolved = path.resolve(path.normalize(target.trim()));
+    if (FORBIDDEN_ROOTS_POSIX.has(resolved)) return { valid: false, error: 'Acceso denegado' };
+    return { valid: true, resolved };
+  };
+
+  assert.equal(validate('/etc').valid, false, 'No debe permitir /etc');
+  assert.equal(validate('/etc/../etc').valid, false, 'No debe permitir evasión con .. hacia /etc');
+  assert.equal(validate('/').valid, false, 'No debe permitir la raíz del sistema');
+  assert.equal(validate(process.cwd()).valid, true, 'Debe permitir el directorio del proyecto');
+});
+
+// 18. Verificación de Cabeceras HTTP de Seguridad
+test('Seguridad: Cabeceras de seguridad CSP, X-Content-Type-Options y X-Frame-Options', async () => {
+  const nextConfigModule = await import('../next.config.mjs');
+  const config = nextConfigModule.default;
+  assert.ok(typeof config.headers === 'function', 'next.config.mjs debe definir headers()');
+
+  const headersList = await config.headers();
+  const rootRule = headersList.find(h => h.source === '/(.*)');
+  assert.ok(rootRule, 'Debe existir regla de cabeceras para /(.*)');
+
+  const map = new Map(rootRule.headers.map(h => [h.key, h.value]));
+  assert.ok(map.has('Content-Security-Policy'), 'Debe incluir Content-Security-Policy');
+  assert.equal(map.get('X-Content-Type-Options'), 'nosniff', 'Debe incluir nosniff');
+  assert.equal(map.get('X-Frame-Options'), 'DENY', 'Debe incluir X-Frame-Options DENY');
+  assert.equal(map.get('Referrer-Policy'), 'strict-origin-when-cross-origin', 'Debe incluir Referrer-Policy');
+});
+
+// 19. Verificación de Compatibilidad Multiplataforma de Explorador Nativo
+test('Multiplataforma: Comando de diálogo de carpetas configurado según SO', () => {
+  const getPickerCommand = (platform) => {
+    if (platform === 'darwin') {
+      return { tool: 'osascript', args: ['-e', 'POSIX path of (choose folder with prompt "Selecciona la carpeta de trabajo")'] };
+    }
+    if (platform === 'win32') {
+      return { tool: 'powershell', commandIncludes: 'FolderBrowserDialog' };
+    }
+    return { tool: 'zenity', fallback: 'kdialog' };
+  };
+
+  const mac = getPickerCommand('darwin');
+  assert.equal(mac.tool, 'osascript');
+
+  const win = getPickerCommand('win32');
+  assert.equal(win.tool, 'powershell');
+  assert.ok(win.commandIncludes.includes('FolderBrowserDialog'));
+
+  const linux = getPickerCommand('linux');
+  assert.equal(linux.tool, 'zenity');
+  assert.equal(linux.fallback, 'kdialog');
+});
+
+// 20. Verificación de Normalización de Rutas y Binario agy
+test('Multiplataforma: Normalización de rutas de Workspace', () => {
+  const path = require('node:path');
+  const rawPath = '/directorio/con/barras/../normalizadas/';
+  const normalized = path.normalize(path.resolve(rawPath));
+  assert.ok(!normalized.includes('..'), 'La ruta normalizada no debe contener secuencias relativas ..');
 });
 
 

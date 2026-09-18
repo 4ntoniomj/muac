@@ -9,6 +9,8 @@ import { fetchCurrentQuota } from '@/rotacion/quota-monitor';
 import { getGlobalSettings } from '@/configuracion/settings-store';
 import { findModel } from '@/shared/types/model';
 import type { MessageUsage } from '@/shared/types/chat';
+import { getAgyCommand, normalizeWorkspacePath } from '@/shared/agy-cli';
+import { validateSafeWorkspacePath } from '@/shared/path-security';
 
 export interface AgentActivity {
   stepIndex: number;
@@ -131,12 +133,18 @@ export async function* streamPromptWithAgy(
     args.push('--effort', effort);
   }
 
-  if (options?.projectPath && fs.existsSync(options.projectPath)) {
-    workingDir = path.resolve(options.projectPath);
-    args.push('--add-dir', workingDir);
-  } else if (settings.defaultProjectPath && fs.existsSync(settings.defaultProjectPath)) {
-    workingDir = path.resolve(settings.defaultProjectPath);
-    args.push('--add-dir', workingDir);
+  if (options?.projectPath) {
+    const valid = validateSafeWorkspacePath(options.projectPath);
+    if (valid.valid && valid.resolvedPath) {
+      workingDir = valid.resolvedPath;
+      args.push('--add-dir', normalizeWorkspacePath(workingDir));
+    }
+  } else if (settings.defaultProjectPath) {
+    const valid = validateSafeWorkspacePath(settings.defaultProjectPath);
+    if (valid.valid && valid.resolvedPath) {
+      workingDir = valid.resolvedPath;
+      args.push('--add-dir', normalizeWorkspacePath(workingDir));
+    }
   }
 
   const skipPerms = options?.dangerouslySkipPermissions ?? settings.dangerouslySkipPermissions ?? true;
@@ -163,10 +171,12 @@ export async function* streamPromptWithAgy(
   };
   let duration = 0;
 
-  // Spawneo del proceso agy en el directorio de trabajo especificado
-  const child = spawn('agy', args, {
+  // Spawneo multiplataforma del proceso agy en el directorio de trabajo
+  const agyCmd = getAgyCommand();
+  const child = spawn(agyCmd.command, args, {
     cwd: workingDir,
     env: process.env,
+    shell: agyCmd.shell,
   });
 
   let stderrText = '';

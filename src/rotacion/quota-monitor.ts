@@ -4,6 +4,7 @@ import { getDatabase } from '@/shared/db';
 import type { AccountQuotaSummary, QuotaGroup, QuotaBucket } from '@/shared/types/quota';
 import { getActiveAccount, getAccountById } from '@/cuentas/account-store';
 import { syncStoredTokenToSystem } from '@/cuentas/keyring-sync';
+import { getAgyCommand } from '@/shared/agy-cli';
 
 const execFileAsync = promisify(execFile);
 
@@ -43,12 +44,16 @@ export async function fetchCurrentQuota(accountId?: string): Promise<AccountQuot
   }
 
   try {
-    const { stdout } = await execFileAsync('agy', [
+    const agyCmd = getAgyCommand();
+    const { stdout } = await execFileAsync(agyCmd.command, [
       '--print',
       '/usage',
       '--output-format',
       'json',
-    ]);
+    ], {
+      shell: agyCmd.shell,
+      env: process.env,
+    });
 
     const parsed: AgyUsageOutput = JSON.parse(stdout);
     const groupsRaw = parsed.command?.data?.groups || [];

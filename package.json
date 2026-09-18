@@ -7,7 +7,11 @@
     "build": "next build",
     "start": "next start --port 3000",
     "typecheck": "tsc --noEmit",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "service:install": "node scripts/service-manager.js install",
+    "service:start": "node scripts/service-manager.js start",
+    "service:stop": "node scripts/service-manager.js stop",
+    "service:status": "node scripts/service-manager.js status"
   },
   "dependencies": {
     "clsx": "^2.1.1",

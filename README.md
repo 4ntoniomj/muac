@@ -26,6 +26,49 @@ Cuando la cuenta activa agota sus tokens en cualquiera de las ventanas, el siste
 
 ---
 
+## 🚀 Instalación Rápida (Un Solo Comando)
+
+Ejecuta el script automatizado para tu sistema operativo. El instalador verifica los requisitos previos, instala dependencias, ejecuta la suite de pruebas, compila la aplicación y configura opcionalmente el servicio en segundo plano:
+
+### 🐧 Linux
+```bash
+./scripts/install-linux.sh
+# O descarga y ejecución en un comando:
+# bash <(curl -fsSL https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-linux.sh)
+```
+
+### 🍏 macOS
+```bash
+./scripts/install-macos.sh
+# O descarga y ejecución en un comando:
+# bash <(curl -fsSL https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-macos.sh)
+```
+
+### 🪟 Windows (PowerShell)
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+# O descarga y ejecución directa:
+# irm https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-windows.ps1 | iex
+```
+
+---
+
+## ⚙️ Gestión Unificada del Servicio en Segundo Plano (Daemon)
+
+`muac` incluye un gestor de servicio multiplataforma que se adapta al demonio nativo de tu sistema operativo:
+- **Linux**: Servicio de usuario systemd (`~/.config/systemd/user/muac.service`) con `Restart=always`.
+- **macOS**: Agente launchd (`~/Library/LaunchAgents/com.antonio.muac.plist`) con `RunAtLoad=true` y `KeepAlive=true`.
+- **Windows**: Lanzador invisible de fondo en la carpeta de Inicio (`shell:startup`) o servicio NSSM.
+
+| Comando | Acción |
+| :--- | :--- |
+| `npm run service:install` | Registra y activa el daemon nativo en el sistema |
+| `npm run service:start` | Inicia el servicio en segundo plano |
+| `npm run service:stop` | Detiene la ejecución del servicio |
+| `npm run service:status` | Comprueba el estado de ejecución y logs |
+
+---
+
 ## 💻 Compatibilidad e Instalación por Sistema Operativo
 
 ### Requisitos Previos Generales

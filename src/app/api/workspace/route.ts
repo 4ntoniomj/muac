@@ -1,34 +1,21 @@
 import { NextResponse } from 'next/server';
 import fs from 'node:fs';
 import path from 'node:path';
+import { validateSafeWorkspacePath } from '@/shared/path-security';
 
 export async function POST(req: Request) {
   try {
     const { path: targetPath } = await req.json();
 
-    if (!targetPath || typeof targetPath !== 'string') {
+    const validation = validateSafeWorkspacePath(targetPath);
+    if (!validation.valid || !validation.resolvedPath) {
       return NextResponse.json({
         success: false,
-        error: 'Ruta no proporcionada',
+        error: validation.error || 'Ruta no válida',
       }, { status: 400 });
     }
 
-    const resolved = path.resolve(targetPath.trim());
-
-    if (!fs.existsSync(resolved)) {
-      return NextResponse.json({
-        success: false,
-        error: `El directorio «${resolved}» no existe en el sistema de archivos.`,
-      }, { status: 404 });
-    }
-
-    const stat = fs.statSync(resolved);
-    if (!stat.isDirectory()) {
-      return NextResponse.json({
-        success: false,
-        error: `«${resolved}» no es un directorio válido.`,
-      }, { status: 400 });
-    }
+    const resolved = validation.resolvedPath;
 
     const entries = fs.readdirSync(resolved);
     const hasGit = entries.includes('.git');

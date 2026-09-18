@@ -5,18 +5,84 @@ import fs from 'node:fs';
 
 const execFileAsync = promisify(execFile);
 
-export async function POST() {
-  try {
-    // Comprobar existencia de zenity en el sistema
-    const zenityPath = fs.existsSync('/usr/bin/zenity') ? '/usr/bin/zenity' : 'zenity';
+async function pickFolderLinux(): Promise<string | null> {
+  const hasZenity = fs.existsSync('/usr/bin/zenity');
+  const zenityBin = hasZenity ? '/usr/bin/zenity' : 'zenity';
 
+  try {
     const { stdout } = await execFileAsync(
-      zenityPath,
+      zenityBin,
       ['--file-selection', '--directory', '--title=Seleccionar Workspace de Trabajo en muac'],
       { env: process.env }
     );
+    return stdout.trim() || null;
+  } catch (err: unknown) {
+    const error = err as { code?: number | string };
+    if (error.code === 1) {
+      // Cancelado por el usuario
+      return null;
+    }
 
-    const selectedPath = stdout.trim();
+    // Fallback a kdialog si zenity no está disponible o falla
+    const hasKdialog = fs.existsSync('/usr/bin/kdialog');
+    const kdialogBin = hasKdialog ? '/usr/bin/kdialog' : 'kdialog';
+    try {
+      const { stdout } = await execFileAsync(
+        kdialogBin,
+        ['--getexistingdirectory', process.cwd(), '--title', 'Seleccionar Workspace de Trabajo en muac'],
+        { env: process.env }
+      );
+      return stdout.trim() || null;
+    } catch (kErr: unknown) {
+      const kError = kErr as { code?: number | string };
+      if (kError.code === 1) return null;
+      throw err; // Relanzar el error original de zenity
+    }
+  }
+}
+
+async function pickFolderMacOS(): Promise<string | null> {
+  try {
+    const script = 'POSIX path of (choose folder with prompt "Selecciona la carpeta de trabajo")';
+    const { stdout } = await execFileAsync('osascript', ['-e', script], { env: process.env });
+    return stdout.trim() || null;
+  } catch (err: unknown) {
+    const error = err as { code?: number; stderr?: string };
+    if (error.code === 1 || (error.stderr && error.stderr.includes('User canceled'))) {
+      return null;
+    }
+    throw err;
+  }
+}
+
+async function pickFolderWindows(): Promise<string | null> {
+  try {
+    const command = 'Add-Type -AssemblyName System.Windows.Forms; $d = New-Object System.Windows.Forms.FolderBrowserDialog; if($d.ShowDialog() -eq "OK"){ $d.SelectedPath }';
+    const { stdout } = await execFileAsync('powershell', ['-NoProfile', '-Command', command], { env: process.env });
+    return stdout.trim() || null;
+  } catch (err: unknown) {
+    const error = err as { code?: number };
+    if (error.code === 1) return null;
+    throw err;
+  }
+}
+
+export async function POST() {
+  try {
+    const platform = process.platform;
+    let selectedPath: string | null = null;
+
+    if (platform === 'linux') {
+      selectedPath = await pickFolderLinux();
+    } else if (platform === 'darwin') {
+      selectedPath = await pickFolderMacOS();
+    } else if (platform === 'win32') {
+      selectedPath = await pickFolderWindows();
+    } else {
+      // Fallback genérico para otros entornos
+      selectedPath = await pickFolderLinux();
+    }
+
     if (selectedPath) {
       return NextResponse.json({
         success: true,
@@ -27,12 +93,7 @@ export async function POST() {
     return NextResponse.json({ success: false, cancelled: true });
   } catch (err: unknown) {
     const error = err as { code?: number; stderr?: string };
-    // Zenity retorna código 1 si el usuario cancela o cierra la ventana de selección
-    if (error.code === 1) {
-      return NextResponse.json({ success: false, cancelled: true });
-    }
-
-    console.error('Error al ejecutar zenity:', err);
+    console.error('Error al ejecutar selector nativo de carpetas:', err);
     return NextResponse.json(
       {
         success: false,
