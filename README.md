@@ -19,16 +19,22 @@ El repositorio incluye scripts que comprueban dependencias, instalan paquetes de
 En Linux:
 ```bash
 ./scripts/install-linux.sh
+# O descarga y ejecución en un comando:
+# bash <(curl -fsSL https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-linux.sh)
 ```
 
 En macOS:
 ```bash
 ./scripts/install-macos.sh
+# O descarga y ejecución en un comando:
+# bash <(curl -fsSL https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-macos.sh)
 ```
 
 En Windows (PowerShell):
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+# O descarga y ejecución en un comando:
+# irm https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-windows.ps1 | iex
 ```
 
 ## Servicio en segundo plano

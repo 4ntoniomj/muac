@@ -2,6 +2,14 @@
   "name": "muac",
   "version": "0.1.0",
   "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/4ntoniomj/muac.git"
+  },
+  "bugs": {
+    "url": "https://github.com/4ntoniomj/muac/issues"
+  },
+  "homepage": "https://github.com/4ntoniomj/muac#readme",
   "scripts": {
     "dev": "next dev --port 3000",
     "build": "next build",
