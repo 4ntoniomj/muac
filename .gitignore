@@ -1,27 +1,101 @@
-# Entorno y secretos
+# =====================================================================
+# BLINDAJE DE SEGURIDAD Y PRIVACIDAD DE INFORMACIÓN SENSIBLE
+# =====================================================================
+
+# 1. Variables de entorno y secretos
 .env
-.env*.local
+.env*
+!.env.example
 
-# Dependencias
+# 2. Claves criptográficas, certificados y tokens
+*.pem
+*.key
+*.pkcs12
+*.pfx
+*.p12
+*.crt
+*.cer
+*.der
+*.secret
+*.token
+*.keyring
+*.kdbx
+
+# Claves SSH y hosts conocidos
+id_rsa*
+id_ecdsa*
+id_ed25519*
+authorized_keys*
+known_hosts*
+
+# Credenciales de proveedores Cloud y Google OAuth / Service Accounts
+credentials.json
+client_secret*.json
+google-credentials*.json
+service-account*.json
+firebase-adminsdk*.json
+.gcloud/
+.aws/
+.azure/
+
+# 3. Bases de datos locales, cuentas y almacenamiento de chats
+data/
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sql
+*.dump
+
+# Directorios locales de agentes y herramientas personales
+.antigravity/
+.gemini/
+.agy/
+
+# 4. Logs, temporales y volcados de depuración
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+*.stackdump
+core.*
+tmp/
+temp/
+scratch/
+.cache/
+
+# Backups y archivos residuales
+*.bak
+*.backup
+*.old
+*~
+*.swp
+*.swo
+
+# 5. Dependencias y compilación de Next.js
 node_modules/
-
-# Compilación y builds
 .next/
 out/
 build/
 dist/
 *.tsbuildinfo
+.turbo/
+.vercel/
 
-# Datos locales persistentes
-data/*.db
-data/*.db-wal
-data/*.db-shm
-data/*.db-journal
-
-# Logs
-*.log
-npm-debug.log*
-
-# Sistema operativo
+# 6. Archivos de sistema operativo y editores
 .DS_Store
-*.pem
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.idea/
+.vscode/
+
+# 7. Reportes de pruebas y cobertura
+coverage/
+.nyc_output/
