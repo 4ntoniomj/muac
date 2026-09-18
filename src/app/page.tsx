@@ -1,0 +1,420 @@
+'use client';
+
+import React, { useState, useEffect, useCallback } from 'react';
+import { Sidebar } from '@/chat/components/sidebar';
+import { ChatCanvas } from '@/chat/components/chat-canvas';
+import { SettingsModal } from '@/configuracion/components/settings-modal';
+import type { Conversation, Message } from '@/shared/types/chat';
+import type { AccountWithQuota } from '@/shared/types/account';
+import type { GlobalSettings } from '@/shared/types/settings';
+import type { RotationEvent } from '@/shared/types/quota';
+import { DEFAULT_SETTINGS } from '@/shared/types/settings';
+
+export default function MuacApp() {
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [accounts, setAccounts] = useState<AccountWithQuota[]>([]);
+  const [activeAccountId, setActiveAccountId] = useState<string>('');
+  const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_SETTINGS);
+  const [rotationLogs, setRotationLogs] = useState<RotationEvent[]>([]);
+  const [activeModelId, setActiveModelId] = useState<string>(DEFAULT_SETTINGS.defaultModelId);
+
+  // Estados de streaming y modales
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingDelta, setStreamingDelta] = useState('');
+  const [rotationNotice, setRotationNotice] = useState<{
+    fromEmail: string;
+    toEmail: string;
+    reason: string;
+  } | null>(null);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'rotacion' | 'cuentas' | 'general'>('rotacion');
+
+  // 1. Cargar configuración inicial
+  const loadSettings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/settings');
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setSettings(data.settings);
+        setActiveModelId(data.settings.defaultModelId || DEFAULT_SETTINGS.defaultModelId);
+      }
+    } catch (err) {
+      console.error('Error al cargar configuración:', err);
+    }
+  }, []);
+
+  // 2. Cargar cuentas
+  const loadAccounts = useCallback(async () => {
+    try {
+      const res = await fetch('/api/accounts');
+      const data = await res.json();
+      if (data.success) {
+        setAccounts(data.accounts || []);
+        if (data.activeAccount) {
+          setActiveAccountId(data.activeAccount.id);
+        }
+        if (data.rotationLogs) {
+          setRotationLogs(data.rotationLogs);
+        }
+
+        // Si no hay ninguna cuenta registrada, importar automáticamente la cuenta activa del sistema
+        if ((!data.accounts || data.accounts.length === 0)) {
+          const importRes = await fetch('/api/accounts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'import_system' }),
+          });
+          const importData = await importRes.json();
+          if (importData.success && importData.account) {
+            setAccounts([importData.account]);
+            setActiveAccountId(importData.account.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error al cargar cuentas:', err);
+    }
+  }, []);
+
+  // 3. Cargar conversaciones
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/conversations');
+      const data = await res.json();
+      if (data.success) {
+        setConversations(data.conversations || []);
+        if (data.conversations && data.conversations.length > 0 && !activeConversationId) {
+          setActiveConversationId(data.conversations[0].id);
+        }
+      }
+    } catch (err) {
+      console.error('Error al cargar conversaciones:', err);
+    }
+  }, [activeConversationId]);
+
+  // 4. Cargar mensajes de la conversación activa
+  const loadMessages = useCallback(async (conversationId: string) => {
+    try {
+      const res = await fetch(`/api/conversations/${conversationId}`);
+      const data = await res.json();
+      if (data.success) {
+        setMessages(data.messages || []);
+        if (data.conversation?.modelId) {
+          setActiveModelId(data.conversation.modelId);
+        }
+      }
+    } catch (err) {
+      console.error('Error al cargar mensajes:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSettings();
+    loadAccounts();
+    loadConversations();
+  }, [loadSettings, loadAccounts, loadConversations]);
+
+  useEffect(() => {
+    if (activeConversationId) {
+      loadMessages(activeConversationId);
+    } else {
+      setMessages([]);
+    }
+  }, [activeConversationId, loadMessages]);
+
+  // Manejo de nueva conversación
+  const handleNewConversation = async () => {
+    try {
+      const res = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: 'Nueva conversación',
+          modelId: activeModelId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success && data.conversation) {
+        setConversations((prev) => [data.conversation, ...prev]);
+        setActiveConversationId(data.conversation.id);
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error('Error al crear conversación:', err);
+    }
+  };
+
+  // Manejo de eliminación de conversación
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
+      setConversations((prev) => prev.filter((c) => c.id !== id));
+      if (activeConversationId === id) {
+        const remaining = conversations.filter((c) => c.id !== id);
+        setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
+      }
+    } catch (err) {
+      console.error('Error al eliminar conversación:', err);
+    }
+  };
+
+  // Manejo de selección de cuenta activa
+  const handleSelectAccount = async (accountId: string) => {
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'set_active', accountId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActiveAccountId(accountId);
+        await loadAccounts();
+      }
+    } catch (err) {
+      console.error('Error al cambiar cuenta activa:', err);
+    }
+  };
+
+  // Manejo de toggle del pool de rotación
+  const handleTogglePool = async (accountId: string, inPool: boolean) => {
+    try {
+      await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggle_pool', accountId, inPool }),
+      });
+      await loadAccounts();
+    } catch (err) {
+      console.error('Error al alternar pool:', err);
+    }
+  };
+
+  // Manejo de eliminación de cuenta
+  const handleDeleteAccount = async (accountId: string) => {
+    try {
+      await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'delete', accountId }),
+      });
+      await loadAccounts();
+    } catch (err) {
+      console.error('Error al eliminar cuenta:', err);
+    }
+  };
+
+  // Manejo de importación de cuenta del sistema
+  const handleImportSystemAccount = async () => {
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_system' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        await loadAccounts();
+        alert('Cuenta del sistema importada con éxito.');
+      } else {
+        alert(data.error || 'No se pudo importar la cuenta.');
+      }
+    } catch (err) {
+      console.error('Error al importar cuenta:', err);
+    }
+  };
+
+  // Manejo de refresco manual de cuotas
+  const handleRefreshQuotas = async () => {
+    try {
+      await fetch('/api/quota');
+      await loadAccounts();
+    } catch (err) {
+      console.error('Error al refrescar cuotas:', err);
+    }
+  };
+
+  // Manejo de actualización de configuración global
+  const handleUpdateSettings = async (newSettings: Partial<GlobalSettings>) => {
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newSettings),
+      });
+      const data = await res.json();
+      if (data.success && data.settings) {
+        setSettings(data.settings);
+        if (data.settings.defaultModelId) {
+          setActiveModelId(data.settings.defaultModelId);
+        }
+      }
+    } catch (err) {
+      console.error('Error al actualizar configuración:', err);
+    }
+  };
+
+  // Envío de mensaje con streaming
+  const handleSendMessage = async (text: string) => {
+    let targetConvoId = activeConversationId;
+
+    // Si no hay conversación activa, crear una primero
+    if (!targetConvoId) {
+      const createRes = await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: text.slice(0, 30), modelId: activeModelId }),
+      });
+      const createData = await createRes.json();
+      if (!createData.success || !createData.conversation) {
+        alert('Error al iniciar conversación');
+        return;
+      }
+      targetConvoId = createData.conversation.id;
+      setActiveConversationId(targetConvoId);
+      setConversations((prev) => [createData.conversation, ...prev]);
+    }
+
+    if (!targetConvoId) return;
+
+    // Agregar mensaje de usuario inmediatamente a la interfaz
+    const tempUserMsg: Message = {
+      id: 'temp_' + Date.now(),
+      conversationId: targetConvoId,
+      role: 'user',
+      content: text,
+      createdAt: new Date().toISOString(),
+      modelId: activeModelId,
+    };
+    setMessages((prev) => [...prev, tempUserMsg]);
+
+    setIsStreaming(true);
+    setStreamingDelta('');
+    setRotationNotice(null);
+
+    try {
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversationId: targetConvoId,
+          prompt: text,
+          modelId: activeModelId,
+          accountId: activeAccountId,
+        }),
+      });
+
+      if (!response.ok || !response.body) {
+        throw new Error('Fallo al conectar con el stream del servidor');
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+      let fullAssistantText = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+
+          try {
+            const event = JSON.parse(jsonStr);
+
+            if (event.type === 'delta' && event.text) {
+              fullAssistantText += event.text;
+              setStreamingDelta(fullAssistantText);
+            } else if (event.type === 'rotated' && event.rotationInfo) {
+              // Notificación visual de rotación automática
+              setRotationNotice(event.rotationInfo);
+              await loadAccounts();
+            } else if (event.type === 'done') {
+              // Completado
+            } else if (event.type === 'error') {
+              console.error('Error devuelto por stream:', event.error);
+              alert(event.error);
+            }
+          } catch (pErr) {
+            console.error('Error parseando evento SSE:', pErr);
+          }
+        }
+      }
+
+      // Recargar mensajes persistidos y cuotas actualizadas
+      await loadMessages(targetConvoId);
+      await loadConversations();
+      await loadAccounts();
+    } catch (err) {
+      console.error('Error al enviar mensaje:', err);
+      alert((err as Error).message || 'Error en la transmisión');
+    } finally {
+      setIsStreaming(false);
+      setStreamingDelta('');
+    }
+  };
+
+  const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
+
+  return (
+    <div className="flex h-screen w-screen overflow-hidden bg-background">
+      {/* Barra Lateral Izquierda */}
+      <Sidebar
+        conversations={conversations}
+        activeConversationId={activeConversationId}
+        onSelectConversation={(id) => setActiveConversationId(id)}
+        onNewConversation={handleNewConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onOpenSettings={() => {
+          setSettingsInitialTab('rotacion');
+          setIsSettingsOpen(true);
+        }}
+        activeAccountEmail={activeAccount?.email}
+      />
+
+      {/* Canvas Principal de Conversación */}
+      <ChatCanvas
+        messages={messages}
+        activeModelId={activeModelId}
+        onSelectModel={(mId) => setActiveModelId(mId)}
+        accounts={accounts}
+        activeAccountId={activeAccountId}
+        onSelectAccount={handleSelectAccount}
+        onSendMessage={handleSendMessage}
+        isStreaming={isStreaming}
+        streamingDelta={streamingDelta}
+        rotationNotice={rotationNotice}
+        onOpenSettings={(tab) => {
+          setSettingsInitialTab(tab);
+          setIsSettingsOpen(true);
+        }}
+      />
+
+      {/* Modal de Configuración Global */}
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        accounts={accounts}
+        settings={settings}
+        rotationLogs={rotationLogs}
+        initialTab={settingsInitialTab}
+        onUpdateSettings={handleUpdateSettings}
+        onTogglePool={handleTogglePool}
+        onSetActiveAccount={handleSelectAccount}
+        onDeleteAccount={handleDeleteAccount}
+        onImportSystemAccount={handleImportSystemAccount}
+        onRefreshQuotas={handleRefreshQuotas}
+      />
+    </div>
+  );
+}

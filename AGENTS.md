@@ -20,7 +20,10 @@ Registra aquí cada dominio en cuanto se cree, con el enlace a las reglas de su 
 
 | Dominio | Responsabilidad | Reglas del squad |
 | :--- | :--- | :--- |
-| `src/<dominio>/` | qué resuelve | `src/<dominio>/AGENTS.md` |
+| `src/cuentas/` | Gestión de cuentas Google OAuth, tokens y sincronización de credenciales con Secret Service | [`src/cuentas/AGENTS.md`](file:///home/antonio/Escritorio/Todo/IA/prueba/src/cuentas/AGENTS.md) |
+| `src/rotacion/` | Monitoreo de cuotas de 5h y semanales, algoritmo de pool y conmutación automática | [`src/rotacion/AGENTS.md`](file:///home/antonio/Escritorio/Todo/IA/prueba/src/rotacion/AGENTS.md) |
+| `src/chat/` | Hilos de conversación, motor de streaming con agy y aro de ventana de contexto | [`src/chat/AGENTS.md`](file:///home/antonio/Escritorio/Todo/IA/prueba/src/chat/AGENTS.md) |
+| `src/configuracion/` | Configuración global persistente y parámetros del pool de iteración | [`src/configuracion/AGENTS.md`](file:///home/antonio/Escritorio/Todo/IA/prueba/src/configuracion/AGENTS.md) |
 
 ---
 
