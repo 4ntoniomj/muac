@@ -15,6 +15,7 @@ import {
   Trash2,
   CheckCircle2,
   AlertTriangle,
+  AlertCircle,
   History,
   ShieldCheck,
   ExternalLink,
@@ -70,6 +71,7 @@ export function SettingsModal({
       subagents: true,
     }
   );
+  const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt || '');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [manualTokenInput, setManualTokenInput] = useState('');
   const [isImportingToken, setIsImportingToken] = useState(false);
@@ -106,6 +108,7 @@ export function SettingsModal({
     await onUpdateSettings({
       defaultModelId,
       reasoningEffort,
+      systemPrompt,
       autoRotateOn5h: autoRotate5h,
       autoRotateOnWeekly: autoRotateWeekly,
       rotationThresholdFraction: threshold / 100,
@@ -592,6 +595,41 @@ export function SettingsModal({
                     <option value="medium">Medio (Medium) - Razonamiento balanceado</option>
                     <option value="high">Alto (High) - Pensamiento exhaustivo</option>
                   </select>
+                </div>
+              </div>
+
+              {/* Instrucciones de Sistema (System Prompt) con Advertencia de Modelos */}
+              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-slate-200 font-semibold text-xs flex items-center gap-2">
+                    <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                    <span>Instrucciones de Sistema (System Prompt):</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-mono">Directiva global de comportamiento</span>
+                </div>
+
+                <textarea
+                  value={systemPrompt}
+                  onChange={(e) => setSystemPrompt(e.target.value)}
+                  rows={3}
+                  placeholder="Define directivas de comportamiento y directrices técnicas personalizadas para el agente..."
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs font-sans resize-y leading-relaxed"
+                />
+
+                {/* Advertencia de Compatibilidad de Modelos */}
+                <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs flex items-start gap-2.5">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="flex flex-col gap-1 text-[11px] leading-relaxed">
+                    <span className="font-semibold text-amber-300">
+                      Modelos que NO tomarán en cuenta este System Prompt:
+                    </span>
+                    <p className="text-amber-200/90">
+                      Los modelos de terceros (3P) como <strong className="text-amber-100">Claude Sonnet 4.6</strong>, <strong className="text-amber-100">Claude Opus 4.6 (Thinking)</strong> y <strong className="text-amber-100">GPT-OSS 120B</strong> ignoran el System Prompt personalizado debido a las restricciones de aislamiento del harness de Antigravity.
+                    </p>
+                    <p className="text-emerald-400 font-medium">
+                      ✓ Los modelos nativos de <strong className="text-emerald-300">Google Gemini (Gemini 3.8 Flash, Gemini 3.7 Flash, Gemini 3.1 Pro)</strong> sí toman en cuenta e incorporan estas directivas en cada interacción.
+                    </p>
+                  </div>
                 </div>
               </div>
 

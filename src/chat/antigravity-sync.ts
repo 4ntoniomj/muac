@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
 import { getDatabase } from '@/shared/db';
 
 export interface SyncResult {
@@ -82,11 +83,8 @@ export function loadAntigravitySummariesMeta(): Map<string, ConvoSummaryMeta> {
   ];
 
   for (const dbPath of summaryDbPaths) {
-    if (!fs.existsSync(/*turbopackIgnore: true*/ dbPath)) continue;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const Database = require('better-sqlite3');
-      const sumDb = new Database(dbPath, { readonly: true });
+      const sumDb = new DatabaseSync(dbPath, { readOnly: true });
       const rows = sumDb.prepare('SELECT conversation_id, title, workspace_uris FROM conversation_summaries').all() as Array<{
         conversation_id: string;
         title?: string;

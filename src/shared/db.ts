@@ -120,6 +120,12 @@ function initDatabaseSchema(db: DatabaseSync): void {
       verifier TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS projects (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      path TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL
+    );
   `);
 
   // Migraciones seguras: asegurar columnas en bases de datos existentes
@@ -135,6 +141,11 @@ function initDatabaseSchema(db: DatabaseSync): void {
   }
   try {
     db.exec("ALTER TABLE conversations ADD COLUMN reasoning_effort TEXT NOT NULL DEFAULT 'high';");
+  } catch {
+    // La columna ya existe
+  }
+  try {
+    db.exec('ALTER TABLE messages ADD COLUMN attachments_json TEXT;');
   } catch {
     // La columna ya existe
   }

@@ -3,16 +3,17 @@ import { streamPromptWithAgy } from '@/chat/agy-bridge';
 import { saveMessage, getConversation, updateConversationTitle } from '@/chat/chat-store';
 import { getActiveAccount } from '@/cuentas/account-store';
 import crypto from 'node:crypto';
+import path from 'node:path';
 import type { Message } from '@/shared/types/chat';
 
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { conversationId, prompt, modelId, accountId, projectPath, reasoningEffort } = body;
+    const { conversationId, prompt, modelId, accountId, projectPath, reasoningEffort, attachments } = body;
 
-    if (!conversationId || !prompt) {
+    if (!conversationId || (!prompt && (!attachments || attachments.length === 0))) {
       return NextResponse.json(
-        { success: false, error: 'conversationId y prompt requeridos' },
+        { success: false, error: 'conversationId y prompt o archivos adjuntos requeridos' },
         { status: 400 }
       );
     }
@@ -46,23 +47,37 @@ export async function POST(req: Request) {
     const targetAcc = accountId ? getAccountById(accountId) : null;
     const effectiveSenderAcc = targetAcc || activeAcc;
 
-    // 1. Guardar mensaje del usuario
+    // 1. Guardar mensaje del usuario con adjuntos
     const userMsg: Message = {
       id: 'msg_' + crypto.randomUUID(),
       conversationId,
       role: 'user',
-      content: prompt,
+      content: prompt || (attachments?.length ? `[${attachments.length} archivo(s) adjunto(s)]` : ''),
       createdAt: new Date().toISOString(),
       accountId: effectiveSenderAcc?.id,
       accountEmail: effectiveSenderAcc?.email,
       modelId: effectiveModelId,
       reasoningEffort: effectiveReasoningEffort,
+      attachments: attachments && attachments.length > 0 ? attachments : undefined,
     };
     saveMessage(userMsg);
 
+    // Formatear prompt efectivo para agy con referencias a los archivos adjuntos
+    let effectivePrompt = prompt || '';
+    if (attachments && attachments.length > 0) {
+      const attachDesc = attachments
+        .map((att: any) => {
+          const lineInfo = att.lineCount ? `, ${att.lineCount} líneas` : '';
+          return `[Archivo adjunto: "${att.name}" (${att.type}${lineInfo}), ruta local accesible: ${att.path || att.url}]`;
+        })
+        .join('\n');
+      effectivePrompt = effectivePrompt ? `${attachDesc}\n\n${effectivePrompt}` : attachDesc;
+    }
+
     // Auto-titulado si es el primer mensaje
     if (convo.title === 'Nueva conversación') {
-      const autoTitle = prompt.slice(0, 35) + (prompt.length > 35 ? '...' : '');
+      const titleSource = prompt || (attachments?.[0]?.name ? `Archivo: ${attachments[0].name}` : 'Conversación');
+      const autoTitle = titleSource.slice(0, 35) + (titleSource.length > 35 ? '...' : '');
       updateConversationTitle(conversationId, autoTitle);
     }
 
@@ -78,7 +93,7 @@ export async function POST(req: Request) {
 
         try {
           for await (const event of streamPromptWithAgy(
-            prompt,
+            effectivePrompt,
             effectiveModelId,
             conversationId,
             accountId,
@@ -106,6 +121,23 @@ export async function POST(req: Request) {
 
           // Guardar mensaje final del asistente
           if (assistantContent.trim().length > 0) {
+            // Detección de posibles archivos/fotos/videos generados por el asistente
+            const assistantAttachments: any[] = [];
+            const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+            let imgMatch;
+            while ((imgMatch = imgRegex.exec(assistantContent)) !== null) {
+              const url = imgMatch[2];
+              assistantAttachments.push({
+                id: 'att_' + crypto.randomUUID(),
+                name: imgMatch[1] || path.basename(url) || 'imagen',
+                type: 'image',
+                mimeType: 'image/png',
+                size: 0,
+                url,
+                path: url.startsWith('/') ? url : undefined,
+              });
+            }
+
             const assistantMsg: Message = {
               id: 'msg_' + crypto.randomUUID(),
               conversationId,
@@ -118,6 +150,7 @@ export async function POST(req: Request) {
               accountEmail: responderAccountEmail,
               modelId: effectiveModelId,
               reasoningEffort: effectiveReasoningEffort,
+              attachments: assistantAttachments.length > 0 ? assistantAttachments : undefined,
             };
             saveMessage(assistantMsg);
           }

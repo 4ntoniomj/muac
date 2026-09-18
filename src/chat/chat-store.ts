@@ -203,38 +203,53 @@ export function getMessages(conversationId: string): Message[] {
     account_id: string | null;
     account_email: string | null;
     model_id: string | null;
+    attachments_json?: string | null;
   }>;
 
-  return rows.map((r) => ({
-    id: r.id,
-    conversationId: r.conversation_id,
-    role: r.role,
-    content: r.content,
-    createdAt: r.created_at,
-    durationSeconds: r.duration_seconds ?? undefined,
-    usage: {
-      inputTokens: r.input_tokens,
-      outputTokens: r.output_tokens,
-      thinkingTokens: r.thinking_tokens,
-      totalTokens: r.total_tokens,
-    },
-    accountId: r.account_id ?? undefined,
-    accountEmail: r.account_email ?? undefined,
-    modelId: r.model_id ?? undefined,
-  }));
+  return rows.map((r) => {
+    let attachments = undefined;
+    if (r.attachments_json) {
+      try {
+        attachments = JSON.parse(r.attachments_json);
+      } catch {
+        attachments = undefined;
+      }
+    }
+
+    return {
+      id: r.id,
+      conversationId: r.conversation_id,
+      role: r.role,
+      content: r.content,
+      createdAt: r.created_at,
+      durationSeconds: r.duration_seconds ?? undefined,
+      usage: {
+        inputTokens: r.input_tokens,
+        outputTokens: r.output_tokens,
+        thinkingTokens: r.thinking_tokens,
+        totalTokens: r.total_tokens,
+      },
+      accountId: r.account_id ?? undefined,
+      accountEmail: r.account_email ?? undefined,
+      modelId: r.model_id ?? undefined,
+      attachments,
+    };
+  });
 }
 
 export function saveMessage(msg: Message): Message {
   const db = getDatabase();
   const now = msg.createdAt || new Date().toISOString();
+  const attachmentsJson =
+    msg.attachments && msg.attachments.length > 0 ? JSON.stringify(msg.attachments) : null;
 
   db.prepare(`
     INSERT INTO messages (
       id, conversation_id, role, content, created_at, duration_seconds,
       input_tokens, output_tokens, thinking_tokens, total_tokens,
-      account_id, account_email, model_id
+      account_id, account_email, model_id, attachments_json
     )
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     msg.id,
     msg.conversationId,
@@ -248,7 +263,8 @@ export function saveMessage(msg: Message): Message {
     msg.usage?.totalTokens ?? 0,
     msg.accountId ?? null,
     msg.accountEmail ?? null,
-    msg.modelId ?? null
+    msg.modelId ?? null,
+    attachmentsJson
   );
 
   // Actualizar timestamps y tokens reales de la conversación

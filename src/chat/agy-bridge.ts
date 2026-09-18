@@ -113,9 +113,16 @@ export async function* streamPromptWithAgy(
 
   // 3. Resolver directorio de trabajo (Workspace) y banderas de agy
   let workingDir = process.cwd();
+
+  // Inclusión de System Prompt solo para modelos Gemini compatibles (los 3P lo ignoran)
+  let effectivePrompt = prompt;
+  if (settings.systemPrompt && settings.systemPrompt.trim() && modelGroup === 'gemini') {
+    effectivePrompt = `[System Instructions / Instrucciones de Sistema]:\n${settings.systemPrompt.trim()}\n\n${prompt}`;
+  }
+
   const args = [
     '--print',
-    prompt,
+    effectivePrompt,
     '--model',
     model.id,
     '--conversation',

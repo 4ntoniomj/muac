@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Sidebar } from '@/chat/components/sidebar';
 import { ChatCanvas } from '@/chat/components/chat-canvas';
 import { SettingsModal } from '@/configuracion/components/settings-modal';
-import type { Conversation, Message } from '@/shared/types/chat';
+import type { Conversation, Message, Attachment } from '@/shared/types/chat';
 import type { AccountWithQuota } from '@/shared/types/account';
 import type { GlobalSettings } from '@/shared/types/settings';
 import type { RotationEvent } from '@/shared/types/quota';
@@ -253,8 +253,13 @@ export default function MuacApp() {
   };
 
   // Manejo de nueva conversación
-  const handleNewConversation = async () => {
+  const handleNewConversation = async (projectPathOverride?: string) => {
     try {
+      const effectivePath =
+        projectPathOverride === 'outside-of-project'
+          ? 'outside-of-project'
+          : projectPathOverride || activeProjectPath || settings.defaultProjectPath || undefined;
+
       const res = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -262,15 +267,17 @@ export default function MuacApp() {
           title: 'Nueva conversación',
           modelId: activeModelId,
           reasoningEffort: activeReasoningEffort,
-          projectPath: activeProjectPath || settings.defaultProjectPath,
+          projectPath: effectivePath,
         }),
       });
       const data = await res.json();
       if (data.success && data.conversation) {
         setConversations((prev) => [data.conversation, ...prev]);
         handleSelectConversation(data.conversation.id);
-        if (data.conversation.projectPath) {
+        if (data.conversation.projectPath && data.conversation.projectPath !== 'outside-of-project') {
           setActiveProjectPath(data.conversation.projectPath);
+        } else if (projectPathOverride === 'outside-of-project') {
+          setActiveProjectPath('');
         }
         setMessages([]);
       }
@@ -532,17 +539,20 @@ export default function MuacApp() {
     }
   };
 
-  // Envío de mensaje con streaming
-  const handleSendMessage = async (text: string) => {
+  // Envío de mensaje con streaming y soporte de archivos adjuntos
+  const handleSendMessage = async (text: string, attachments?: Attachment[]) => {
     let targetConvoId = activeConversationId;
 
     // Si no hay conversación activa, crear una primero
     if (!targetConvoId) {
+      const defaultTitle =
+        text.slice(0, 30) ||
+        (attachments?.[0]?.name ? `Archivo: ${attachments[0].name}` : 'Nueva conversación');
       const createRes = await fetch('/api/conversations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: text.slice(0, 30),
+          title: defaultTitle,
           modelId: activeModelId,
           reasoningEffort: activeReasoningEffort,
           projectPath: activeProjectPath || settings.defaultProjectPath || undefined,
@@ -563,15 +573,16 @@ export default function MuacApp() {
 
     if (!targetConvoId) return;
 
-    // Agregar mensaje de usuario inmediatamente a la interfaz
+    // Agregar mensaje de usuario inmediatamente a la interfaz con adjuntos
     const tempUserMsg: Message = {
       id: 'temp_' + Date.now(),
       conversationId: targetConvoId,
       role: 'user',
-      content: text,
+      content: text || (attachments?.length ? `[${attachments.length} archivo(s) adjunto(s)]` : ''),
       createdAt: new Date().toISOString(),
       modelId: activeModelId,
       reasoningEffort: activeReasoningEffort,
+      attachments,
     };
     setMessages((prev) => [...prev, tempUserMsg]);
 
@@ -592,6 +603,7 @@ export default function MuacApp() {
           reasoningEffort: activeReasoningEffort,
           accountId: activeAccountId,
           projectPath: activeProjectPath,
+          attachments,
         }),
       });
 

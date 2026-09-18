@@ -623,6 +623,129 @@ test('Quota: isQuotaExhausted detecta agotamiento y revierte al pasar la fecha d
   assert.equal(isQuotaExhausted(0.5, 0.01, futureReset, pastReset), false);
 });
 
+// 26. Verificación de Auto-conversión de Texto > 35 líneas a Archivo Adjunto
+test('Adjuntos: Textos con más de 35 líneas se convierten automáticamente en archivo', () => {
+  const shouldConvertToAttachment = (text) => {
+    if (!text) return false;
+    const lines = text.split('\n');
+    return lines.length > 35;
+  };
+
+  const shortText = Array.from({ length: 20 }, (_, i) => `Línea de prueba ${i + 1}`).join('\n');
+  assert.equal(shouldConvertToAttachment(shortText), false, '20 líneas no deben convertirse');
+
+  const boundaryText35 = Array.from({ length: 35 }, (_, i) => `Línea de prueba ${i + 1}`).join('\n');
+  assert.equal(shouldConvertToAttachment(boundaryText35), false, '35 líneas exactas no deben convertirse');
+
+  const longText36 = Array.from({ length: 36 }, (_, i) => `Línea de prueba ${i + 1}`).join('\n');
+  assert.equal(shouldConvertToAttachment(longText36), true, '36 líneas deben convertirse a archivo');
+
+  const veryLongText100 = Array.from({ length: 100 }, (_, i) => `Línea de prueba ${i + 1}`).join('\n');
+  assert.equal(shouldConvertToAttachment(veryLongText100), true, '100 líneas deben convertirse a archivo');
+});
+
+// 27. Verificación de Formateo de Tiempo Relativo (como en Antigravity: 4m, 59m, 6h, 13h, 2d)
+test('Time: formatRelativeTime formatea timestamps idéntico al sidebar de Antigravity', () => {
+  const formatRelativeTime = (dateIso) => {
+    if (!dateIso) return '';
+    const date = new Date(dateIso);
+    const now = Date.now();
+    const diffMs = now - date.getTime();
+    if (isNaN(diffMs) || diffMs < 0) return '1m';
+
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return '1m';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m`;
+    const diffHours = Math.floor(diffMin / 60);
+    if (diffHours < 24) return `${diffHours}h`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d`;
+    const diffWeeks = Math.floor(diffDays / 7);
+    if (diffWeeks < 4) return `${diffWeeks}w`;
+    return `${Math.floor(diffDays / 30)}mo`;
+  };
+
+  const now = Date.now();
+  const m4 = new Date(now - 4 * 60 * 1000).toISOString();
+  assert.equal(formatRelativeTime(m4), '4m');
+
+  const m59 = new Date(now - 59 * 60 * 1000).toISOString();
+  assert.equal(formatRelativeTime(m59), '59m');
+
+  const h6 = new Date(now - 6 * 3600 * 1000).toISOString();
+  assert.equal(formatRelativeTime(h6), '6h');
+
+  const h13 = new Date(now - 13 * 3600 * 1000).toISOString();
+  assert.equal(formatRelativeTime(h13), '13h');
+
+  const d2 = new Date(now - 2 * 86400 * 1000).toISOString();
+  assert.equal(formatRelativeTime(d2), '2d');
+});
+
+// 28. Verificación de Compatibilidad de Modelos para System Prompt
+test('System Prompt: Incorporación para Gemini y exclusión para modelos 3P (Claude, GPT-OSS)', () => {
+  const buildEffectivePrompt = (prompt, systemPrompt, modelGroup) => {
+    if (systemPrompt && systemPrompt.trim() && modelGroup === 'gemini') {
+      return `[System Instructions / Instrucciones de Sistema]:\n${systemPrompt.trim()}\n\n${prompt}`;
+    }
+    return prompt;
+  };
+
+  const sys = 'Actúa como un arquitecto senior.';
+  const userPrompt = '¿Cómo organizar este módulo?';
+
+  // Gemini model -> incluye System Instructions
+  const geminiPrompt = buildEffectivePrompt(userPrompt, sys, 'gemini');
+  assert.ok(geminiPrompt.includes('[System Instructions / Instrucciones de Sistema]'));
+  assert.ok(geminiPrompt.includes(sys));
+  assert.ok(geminiPrompt.includes(userPrompt));
+
+  // 3P model (Claude / GPT-OSS) -> omite System Instructions (advertido en la UI)
+  const claudePrompt = buildEffectivePrompt(userPrompt, sys, '3p');
+  assert.equal(claudePrompt, userPrompt);
+  assert.ok(!claudePrompt.includes('System Instructions'));
+});
+
+// 29. Verificación de Partición de Conversaciones entre Proyectos y Standalone
+test('Sidebar: Partición de conversaciones en Proyectos (Workspaces) y Standalone (Conversations)', () => {
+  const partitionConversations = (conversations) => {
+    const standalone = [];
+    const projectMap = new Map();
+
+    for (const c of conversations) {
+      const p = c.projectPath ? c.projectPath.trim() : '';
+      if (!p || p === 'outside-of-project' || p === 'undefined') {
+        standalone.push(c);
+      } else {
+        const norm = p.replace(/\/+$/, '');
+        if (!projectMap.has(norm)) {
+          projectMap.set(norm, []);
+        }
+        projectMap.get(norm).push(c);
+      }
+    }
+    return { standalone, projectMap };
+  };
+
+  const mockConversations = [
+    { id: '1', title: 'MUAC Hardening', projectPath: '/home/antonio/Escritorio/Todo/IA/prueba' },
+    { id: '2', title: 'Multi Account App', projectPath: '/home/antonio/Escritorio/Todo/IA/prueba' },
+    { id: '3', title: 'Setup Plantilla', projectPath: '/home/antonio/Escritorio/Todo/IA/plantilla' },
+    { id: '4', title: 'Solucionar Cámara OBS', projectPath: 'outside-of-project' },
+    { id: '5', title: 'Consulta rápida', projectPath: '' },
+    { id: '6', title: 'Otra duda', projectPath: null },
+  ];
+
+  const result = partitionConversations(mockConversations);
+  assert.equal(result.standalone.length, 3, 'Debe haber 3 conversaciones standalone');
+  assert.ok(result.projectMap.has('/home/antonio/Escritorio/Todo/IA/prueba'));
+  assert.equal(result.projectMap.get('/home/antonio/Escritorio/Todo/IA/prueba').length, 2);
+  assert.ok(result.projectMap.has('/home/antonio/Escritorio/Todo/IA/plantilla'));
+  assert.equal(result.projectMap.get('/home/antonio/Escritorio/Todo/IA/plantilla').length, 1);
+});
+
+
 
 
 

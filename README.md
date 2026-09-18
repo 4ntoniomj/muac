@@ -71,16 +71,25 @@ Los tiempos restantes para el restablecimiento de 5 horas y semanal se muestran 
 
 ## Entorno de chat y sincronización con Antigravity
 
-La interfaz de chat replica el comportamiento del cliente de escritorio de Antigravity, manteniendo sincronizado el historial local.
+La interfaz de chat replica la organización y el comportamiento del cliente oficial de Antigravity, manteniendo sincronizado el historial local.
 
-### Agrupación por proyectos y espacios de trabajo
+### Estructura de proyectos y conversaciones
 
-muac organiza las conversaciones por proyectos y carpetas de trabajo en la barra lateral:
+La barra lateral divide el historial en dos niveles:
 
-- El sincronizador `src/chat/antigravity-sync.ts` examina las bases de datos de SQLite en `~/.gemini/antigravity/conversation_summaries.db` y `~/.gemini/antigravity-cli/conversation_summaries.db`.
-- Lee la columna `workspace_uris` (array de rutas con esquema `file://`) y extrae la ruta absoluta del proyecto.
-- Si no existe un espacio asignado, asocia la conversación a la carpeta personal (`~`).
-- La barra lateral agrupa las conversaciones bajo carpetas desplegables identificadas con su nombre de directorio y ruta completa en tooltip.
+- Sección Projects: Contenedores de carpetas de proyectos y workspaces registrados (`prueba`, `IA`, `plantilla`, `CLI Project`, etc.). Cada carpeta muestra sus conversaciones indentadas con su título y tiempo relativo transcurrido (`4m`, `59m`, `6h`, `2d`). Los proyectos sin chats muestran el indicador «No conversations yet».
+- Sección Conversations: Chats independientes o consultas directas que no pertenecen a ningún proyecto ni carpeta local (`outside-of-project`).
+- Botón + New Conversation: Inicia un nuevo chat en la cabecera del panel lateral.
+- Acciones rápidas: Anclado de chats prioritarios, filtrado y eliminación con confirmación.
+
+### Envío y recepción de fotos, videos y archivos
+
+Tanto el usuario como el agente pueden intercambiar contenido multimedia y documentos:
+
+- Fotos e imágenes: Se cargan mediante el botón de adjuntos, arrastrando al chat o pegando capturas desde el portapapeles. Se muestran inline en el hilo de mensajes.
+- Videos: Admite formatos mp4, webm y mov, reproduciéndose directamente mediante un reproductor integrado.
+- Archivos y código: Admite documentos, hojas de cálculo y ficheros de código fuente, presentados en tarjetas con nombre, tamaño y botón de descarga.
+- Conversión automática de textos extensos: Cualquier texto o bloque de código pegado o escrito que supere las 35 líneas se convierte automáticamente en un archivo adjunto de texto (`.txt`), evitando saturar el cuerpo del mensaje y facilitando su lectura por parte del agente mediante sus herramientas de lectura.
 
 ### Indicador de ventana de contexto
 
@@ -90,16 +99,16 @@ El indicador circular de contexto (`ContextRing`) está ubicado en la barra de c
 - Cuenta con protección interna contra valores no numéricos o divisiones por cero.
 - Despliega un menú emergente superior con el desglose exacto de tokens utilizados, tokens totales y el porcentaje restante.
 
-### Gestión de conversaciones
-
-- Anclado de chats prioritarios en la parte superior de cada proyecto.
-- Renombrado de títulos de conversación.
-- Eliminación individual con diálogo de confirmación.
-- Selección múltiple para borrado por lotes.
-
 ## Permisos y modos de ejecución del agente
 
-El panel de configuración permite ajustar el grado de autonomía del subproceso `agy`.
+El panel de configuración permite ajustar el grado de autonomía y las directivas del subproceso `agy`.
+
+### Instrucciones de sistema (System Prompt) y compatibilidad de modelos
+
+Permite definir directrices globales de comportamiento técnico para el agente, con una advertencia explícita de compatibilidad según el motor:
+
+- Modelos compatibles: Los modelos nativos de Google Gemini (Gemini 3.8 Flash, Gemini 3.7 Flash, Gemini 3.1 Pro) aceptan e incorporan estas directivas en cada interacción.
+- Modelos que no lo toman en cuenta: Los modelos de terceros (3P) como Claude Sonnet 4.6, Claude Opus 4.6 (Thinking) y GPT-OSS 120B ignoran el System Prompt personalizado debido a las restricciones de aislamiento del harness de Antigravity.
 
 ### Modos globales
 

@@ -5,6 +5,17 @@ export interface MessageUsage {
   totalTokens: number;
 }
 
+export interface Attachment {
+  id: string;
+  name: string;
+  type: 'image' | 'video' | 'file';
+  mimeType: string;
+  size: number;
+  url: string;
+  path?: string;
+  lineCount?: number;
+}
+
 export interface Message {
   id: string;
   conversationId: string;
@@ -17,6 +28,7 @@ export interface Message {
   accountEmail?: string;
   modelId?: string;
   reasoningEffort?: 'low' | 'medium' | 'high';
+  attachments?: Attachment[];
 }
 
 export interface Conversation {

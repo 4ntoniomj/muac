@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import type { Message, ContextWindowUsage } from '@/shared/types/chat';
+import type { Message, ContextWindowUsage, Attachment } from '@/shared/types/chat';
 import type { AccountWithQuota } from '@/shared/types/account';
 import { ContextRing } from './context-ring';
 import { ModelSelector } from './model-selector';
@@ -11,6 +11,7 @@ import { AccountSelector } from '@/cuentas/components/account-selector';
 import { WorkspaceSelector } from './workspace-selector';
 import { calculateContextUsage } from '../context-calc';
 import { findModel } from '@/shared/types/model';
+import { formatFileSize } from '@/shared/time-utils';
 import type { AgentActivity } from '@/chat/agy-bridge';
 import {
   Send,
@@ -18,12 +19,16 @@ import {
   Bot,
   User,
   AlertCircle,
-  ArrowRight,
   ExternalLink,
-  CornerDownLeft,
   Clock,
   Zap,
-  CheckCircle2,
+  Paperclip,
+  FileText,
+  Image as ImageIcon,
+  Film,
+  Download,
+  X,
+  FileCode,
 } from 'lucide-react';
 
 interface ChatCanvasProps {
@@ -36,7 +41,7 @@ interface ChatCanvasProps {
   accounts: AccountWithQuota[];
   activeAccountId: string;
   onSelectAccount: (accountId: string) => void;
-  onSendMessage: (text: string) => Promise<void>;
+  onSendMessage: (text: string, attachments?: Attachment[]) => Promise<void>;
   isStreaming: boolean;
   streamingDelta: string;
   rotationNotice: { fromEmail: string; toEmail: string; reason: string } | null;
@@ -74,8 +79,13 @@ export function ChatCanvas({
   activeConversationTitle,
 }: ChatCanvasProps) {
   const [inputText, setInputText] = useState('');
+  const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeModel = findModel(activeModelId);
 
@@ -99,6 +109,92 @@ export function ChatCanvas({
     }
   }, [inputText]);
 
+  // Subir archivos al servidor
+  const uploadFiles = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      for (let i = 0; i < files.length; i++) {
+        formData.append('files', files[i]);
+      }
+      const res = await fetch('/api/files/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.attachments && data.attachments.length > 0) {
+          setPendingAttachments((prev) => [...prev, ...data.attachments]);
+        } else if (data.attachment) {
+          setPendingAttachments((prev) => [...prev, data.attachment]);
+        }
+      } else {
+        alert(data.error || 'Fallo al subir archivos');
+      }
+    } catch (err) {
+      console.error('Error al subir archivos:', err);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Convertir texto de más de 35 líneas automáticamente a archivo
+  const convertLongTextToAttachment = async (longText: string, customName?: string): Promise<boolean> => {
+    const lines = longText.split('\n');
+    if (lines.length <= 35) return false;
+
+    setIsUploading(true);
+    try {
+      const fileName = customName || 'texto_adjunto.txt';
+      const res = await fetch('/api/files/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: longText, filename: fileName }),
+      });
+      const data = await res.json();
+      if (data.success && data.attachment) {
+        setPendingAttachments((prev) => [...prev, data.attachment]);
+        return true;
+      }
+    } catch (err) {
+      console.error('Error al convertir texto largo a archivo:', err);
+    } finally {
+      setIsUploading(false);
+    }
+    return false;
+  };
+
+  // Detección en cambio de texto
+  const handleTextChange = async (val: string) => {
+    setInputText(val);
+    const lines = val.split('\n');
+    if (lines.length > 35) {
+      const converted = await convertLongTextToAttachment(val, 'documento_texto.txt');
+      if (converted) {
+        setInputText('');
+      }
+    }
+  };
+
+  // Manejo de pegado en el textarea (detecta archivos, capturas de pantalla y texto de > 35 líneas)
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+      e.preventDefault();
+      await uploadFiles(e.clipboardData.files);
+      return;
+    }
+
+    const pastedText = e.clipboardData.getData('text');
+    if (pastedText && pastedText.split('\n').length > 35) {
+      e.preventDefault();
+      const converted = await convertLongTextToAttachment(pastedText, 'texto_pegado.txt');
+      if (converted && !inputText.trim()) {
+        setInputText('Analiza el archivo adjunto.');
+      }
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -106,18 +202,82 @@ export function ChatCanvas({
     }
   };
 
+  const handleRemoveAttachment = (id: string) => {
+    setPendingAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
+
   const handleSubmit = async () => {
-    if (!inputText.trim() || isStreaming) return;
-    const text = inputText;
+    if ((!inputText.trim() && pendingAttachments.length === 0) || isStreaming || isUploading) return;
+
+    let textToSend = inputText.trim();
+    const attachmentsToSend = [...pendingAttachments];
+
+    // Si el texto final tiene más de 35 líneas, convertirlo a archivo automáticamente antes de enviar
+    if (textToSend.split('\n').length > 35) {
+      setIsUploading(true);
+      try {
+        const res = await fetch('/api/files/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ text: textToSend, filename: 'texto_extenso.txt' }),
+        });
+        const data = await res.json();
+        if (data.success && data.attachment) {
+          attachmentsToSend.push(data.attachment);
+          textToSend = 'Procesa el documento de texto adjunto.';
+        }
+      } catch (err) {
+        console.error('Error al subir texto de más de 35 líneas:', err);
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
     setInputText('');
+    setPendingAttachments([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
-    await onSendMessage(text);
+
+    await onSendMessage(textToSend, attachmentsToSend.length > 0 ? attachmentsToSend : undefined);
+  };
+
+  // Descargar texto o código generado como archivo
+  const handleDownloadTextAsFile = (content: string, defaultName: string = 'codigo.txt') => {
+    const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = defaultName;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <main className="flex-1 h-full flex flex-col bg-background relative overflow-hidden">
+    <main
+      className="flex-1 h-full flex flex-col bg-background relative overflow-hidden"
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsDragging(true);
+      }}
+      onDragLeave={() => setIsDragging(false)}
+      onDrop={async (e) => {
+        e.preventDefault();
+        setIsDragging(false);
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          await uploadFiles(e.dataTransfer.files);
+        }
+      }}
+    >
+      {/* Indicador visual de Drag and Drop */}
+      {isDragging && (
+        <div className="absolute inset-0 z-40 bg-blue-950/70 border-2 border-dashed border-blue-400 backdrop-blur-sm flex flex-col items-center justify-center text-blue-200">
+          <Paperclip className="w-12 h-12 mb-2 text-blue-400 animate-bounce" />
+          <p className="text-sm font-semibold">Suelta tus fotos, videos o archivos aquí</p>
+          <p className="text-xs text-blue-300">Se adjuntarán automáticamente a la conversación</p>
+        </div>
+      )}
+
       {/* Alerta de Elegibilidad / Verificación de Cuenta Google */}
       {verificationAlert && (
         <div className="mx-6 mt-4 p-3.5 rounded-xl bg-amber-950/70 border border-amber-500/50 text-xs text-amber-200 shadow-2xl flex items-center justify-between animate-in slide-in-from-top duration-300 backdrop-blur-md">
@@ -179,8 +339,7 @@ export function ChatCanvas({
             </div>
             <h3 className="text-xl font-bold text-white mb-2">muac · Antigravity Pro</h3>
             <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
-              Chat con inteligencia artificial y rotación automática de cuentas al agotar límites de
-              5 horas o semanales.
+              Chat con inteligencia artificial, rotación automática de cuentas y soporte de archivos, fotos y videos.
             </p>
 
             <div className="grid grid-cols-2 gap-3 max-w-lg w-full text-left">
@@ -206,6 +365,9 @@ export function ChatCanvas({
         ) : (
           messages.map((msg) => {
             const isUser = msg.role === 'user';
+            const linesCount = msg.content ? msg.content.split('\n').length : 0;
+            const isLongResponse = linesCount > 35;
+
             return (
               <div
                 key={msg.id}
@@ -220,19 +382,85 @@ export function ChatCanvas({
                 )}
 
                 <div
-                  className={`max-w-[80%] rounded-2xl px-4 py-3 shadow-md ${
+                  className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-md flex flex-col gap-2.5 ${
                     isUser
                       ? 'bg-blue-600 text-white rounded-tr-sm'
                       : 'bg-surface-elevated border border-surface-border text-slate-200 rounded-tl-sm'
                   }`}
                 >
-                  <div className="whitespace-pre-wrap font-sans text-xs break-words">
-                    {msg.content}
-                  </div>
+                  {/* Adjuntos del Mensaje (Fotos, Videos, Archivos) */}
+                  {msg.attachments && msg.attachments.length > 0 && (
+                    <div className="flex flex-col gap-2 pt-0.5">
+                      {msg.attachments.map((att) => (
+                        <div key={att.id} className="rounded-xl overflow-hidden">
+                          {att.type === 'image' ? (
+                            <img
+                              src={att.url}
+                              alt={att.name}
+                              className="max-h-72 max-w-full rounded-xl object-contain bg-black/40 border border-white/10 cursor-pointer hover:opacity-95 transition-opacity"
+                              onClick={() => window.open(att.url, '_blank')}
+                            />
+                          ) : att.type === 'video' ? (
+                            <video
+                              src={att.url}
+                              controls
+                              className="max-h-72 max-w-full rounded-xl bg-black border border-white/10"
+                            />
+                          ) : (
+                            <a
+                              href={att.url}
+                              download={att.name}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                                isUser
+                                  ? 'bg-blue-700/60 border-blue-500/40 hover:bg-blue-700 text-white'
+                                  : 'bg-surface border-surface-border hover:border-blue-500/50 hover:bg-surface-elevated text-slate-200'
+                              }`}
+                            >
+                              <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
+                                <FileText className="w-4 h-4" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-semibold truncate">{att.name}</div>
+                                <div className="text-[10px] opacity-75">
+                                  {att.lineCount ? `${att.lineCount} líneas • ` : ''}
+                                  {formatFileSize(att.size)}
+                                </div>
+                              </div>
+                              <Download className="w-3.5 h-3.5 shrink-0 opacity-80 hover:opacity-100" />
+                            </a>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Contenido de Texto */}
+                  {msg.content && (
+                    <div className="whitespace-pre-wrap font-sans text-xs break-words leading-relaxed">
+                      {renderMessageContentWithMedia(msg.content)}
+                    </div>
+                  )}
+
+                  {/* Si el mensaje del asistente es muy extenso (> 35 líneas), botón para descargarlo como archivo */}
+                  {!isUser && isLongResponse && (
+                    <div className="flex items-center justify-end pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadTextAsFile(msg.content, `respuesta_${msg.id.slice(-6)}.txt`)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-surface-border hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] transition-all"
+                        title="Descargar esta respuesta como archivo de texto"
+                      >
+                        <FileCode className="w-3 h-3 text-blue-400" />
+                        <span>Descargar como archivo ({linesCount} líneas)</span>
+                      </button>
+                    </div>
+                  )}
 
                   {/* Metadatos del mensaje */}
                   {!isUser && msg.usage && (
-                    <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                    <div className="mt-1 pt-2 border-t border-slate-800/80 flex items-center gap-3 text-[10px] text-slate-400 font-mono">
                       {msg.durationSeconds !== undefined && (
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-slate-500" />
@@ -276,7 +504,7 @@ export function ChatCanvas({
                   <Bot className="w-4 h-4" />
                 </div>
 
-                <div className="max-w-[80%] rounded-2xl rounded-tl-sm px-4 py-3 bg-surface-elevated border border-surface-border text-slate-200 shadow-md">
+                <div className="max-w-[85%] rounded-2xl rounded-tl-sm px-4 py-3 bg-surface-elevated border border-surface-border text-slate-200 shadow-md">
                   <div className="whitespace-pre-wrap font-sans text-xs break-words">
                     {streamingDelta}
                     <span className="inline-block w-1.5 h-3.5 ml-1 bg-blue-400 animate-pulse align-middle" />
@@ -325,39 +553,135 @@ export function ChatCanvas({
             </div>
           </div>
 
-          {/* Caja de Redacción */}
-          <div className="relative flex items-end gap-2 p-2 rounded-2xl bg-surface border border-surface-border focus-within:border-blue-500/70 focus-within:ring-1 focus-within:ring-blue-500/40 transition-all shadow-inner">
-            <textarea
-              ref={textareaRef}
-              rows={1}
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isStreaming}
-              placeholder="Envía un mensaje a Antigravity Pro... (Enter para enviar, Shift+Enter para salto de línea)"
-              className="flex-1 bg-transparent text-slate-200 text-xs px-2 py-1.5 focus:outline-none resize-none max-h-44 placeholder:text-slate-500 leading-relaxed font-sans"
-            />
+          {/* Selector oculto de archivos nativo */}
+          <input
+            type="file"
+            ref={fileInputRef}
+            multiple
+            onChange={(e) => {
+              if (e.target.files) uploadFiles(e.target.files);
+            }}
+            className="hidden"
+            accept="image/*,video/*,.pdf,.txt,.md,.json,.ts,.js,.py,.zip,*"
+          />
 
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!inputText.trim() || isStreaming}
-              className={`p-2 rounded-xl text-white font-semibold transition-all shrink-0 ${
-                inputText.trim() && !isStreaming
-                  ? 'bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/30'
-                  : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-              }`}
-              title="Enviar mensaje"
-            >
-              {isStreaming ? (
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-              ) : (
-                <Send className="w-4 h-4" />
-              )}
-            </button>
+          {/* Contenedor de Redacción con Chips de Adjuntos */}
+          <div className="flex flex-col p-2 rounded-2xl bg-surface border border-surface-border focus-within:border-blue-500/70 focus-within:ring-1 focus-within:ring-blue-500/40 transition-all shadow-inner gap-2">
+            {/* Chips de Adjuntos Pendientes */}
+            {pendingAttachments.length > 0 && (
+              <div className="flex items-center gap-2 flex-wrap px-1 pt-1 border-b border-surface-border/50 pb-2">
+                {pendingAttachments.map((att) => (
+                  <div
+                    key={att.id}
+                    className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-surface-elevated border border-surface-border text-xs text-slate-200 shadow-sm animate-in fade-in"
+                  >
+                    {att.type === 'image' ? (
+                      <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    ) : att.type === 'video' ? (
+                      <Film className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                    ) : (
+                      <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                    )}
+
+                    <span className="truncate max-w-[160px] font-medium text-[11px]">{att.name}</span>
+                    {att.lineCount ? (
+                      <span className="text-[10px] text-slate-400 font-mono">({att.lineCount} lín)</span>
+                    ) : (
+                      <span className="text-[10px] text-slate-400 font-mono">({formatFileSize(att.size)})</span>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(att.id)}
+                      className="text-slate-400 hover:text-white ml-0.5"
+                      title="Quitar archivo"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="relative flex items-end gap-2">
+              {/* Botón de Adjuntar Fotos, Videos o Archivos */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isStreaming || isUploading}
+                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-elevated transition-colors shrink-0"
+                title="Adjuntar fotos, videos o archivos (también puedes arrastrarlos o pegar capturas)"
+              >
+                <Paperclip className={`w-4 h-4 ${isUploading ? 'animate-spin text-blue-400' : ''}`} />
+              </button>
+
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={inputText}
+                onChange={(e) => handleTextChange(e.target.value)}
+                onPaste={handlePaste}
+                onKeyDown={handleKeyDown}
+                disabled={isStreaming}
+                placeholder="Envía un mensaje, foto, video o archivo... (textos de >35 líneas se pasan como archivo)"
+                className="flex-1 bg-transparent text-slate-200 text-xs px-1 py-1.5 focus:outline-none resize-none max-h-44 placeholder:text-slate-500 leading-relaxed font-sans"
+              />
+
+              <button
+                type="button"
+                onClick={handleSubmit}
+                disabled={(!inputText.trim() && pendingAttachments.length === 0) || isStreaming || isUploading}
+                className={`p-2 rounded-xl text-white font-semibold transition-all shrink-0 ${
+                  (inputText.trim() || pendingAttachments.length > 0) && !isStreaming && !isUploading
+                    ? 'bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/30'
+                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                }`}
+                title="Enviar mensaje"
+              >
+                {isStreaming || isUploading ? (
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <Send className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>
     </main>
   );
+
+  // Renderizar contenido que pueda contener imágenes o videos en markdown
+  function renderMessageContentWithMedia(rawContent: string) {
+    // Si contiene markdown de imagen ![alt](url)
+    const imgRegex = /!\[([^\]]*)\]\(([^)]+)\)/g;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match;
+
+    while ((match = imgRegex.exec(rawContent)) !== null) {
+      if (match.index > lastIndex) {
+        parts.push(rawContent.slice(lastIndex, match.index));
+      }
+      const alt = match[1];
+      const src = match[2];
+      parts.push(
+        <div key={match.index} className="my-2">
+          <img
+            src={src}
+            alt={alt}
+            className="max-h-72 max-w-full rounded-xl object-contain bg-black/40 border border-white/10 cursor-pointer hover:opacity-95 transition-opacity shadow-md"
+            onClick={() => window.open(src, '_blank')}
+          />
+        </div>
+      );
+      lastIndex = imgRegex.lastIndex;
+    }
+
+    if (lastIndex < rawContent.length) {
+      parts.push(rawContent.slice(lastIndex));
+    }
+
+    return parts.length > 0 ? parts : rawContent;
+  }
 }
