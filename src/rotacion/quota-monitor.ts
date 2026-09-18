@@ -153,3 +153,34 @@ export function getCachedQuotaSnapshot(accountId: string): AccountQuotaSummary |
     return null;
   }
 }
+
+export function isQuotaSnapshotFresh(accountId: string, maxAgeMs: number = 30000): boolean {
+  const db = getDatabase();
+  const stmt = db.prepare('SELECT updated_at FROM quota_snapshots WHERE account_id = ?');
+  const row = stmt.get(accountId) as { updated_at: string } | undefined;
+  if (!row || !row.updated_at) return false;
+
+  const age = Date.now() - new Date(row.updated_at).getTime();
+  return age >= 0 && age < maxAgeMs;
+}
+
+export async function getOrRefreshQuota(
+  accountId: string,
+  maxAgeMs: number = 30000
+): Promise<AccountQuotaSummary | null> {
+  if (isQuotaSnapshotFresh(accountId, maxAgeMs)) {
+    const cached = getCachedQuotaSnapshot(accountId);
+    if (cached) return cached;
+  }
+  return fetchCurrentQuota(accountId);
+}
+
+export async function refreshActiveAccountQuota(force: boolean = true): Promise<AccountQuotaSummary | null> {
+  const active = getActiveAccount();
+  if (!active) return null;
+  if (!force && isQuotaSnapshotFresh(active.id)) {
+    return getCachedQuotaSnapshot(active.id);
+  }
+  return fetchCurrentQuota(active.id);
+}
+

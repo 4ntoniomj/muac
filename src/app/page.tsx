@@ -24,6 +24,7 @@ export default function MuacApp() {
   const [activities, setActivities] = useState<AgentActivity[]>([]);
   const [activeProjectPath, setActiveProjectPath] = useState<string>('');
   const [authToast, setAuthToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+  const [isSyncingConversations, setIsSyncingConversations] = useState(false);
 
   // Estados de streaming y modales
   const [isStreaming, setIsStreaming] = useState(false);
@@ -39,7 +40,7 @@ export default function MuacApp() {
   } | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'rotacion' | 'cuentas' | 'permisos' | 'general'>('rotacion');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'rotacion' | 'cuentas' | 'permisos'>('rotacion');
 
   // 1. Cargar configuración inicial
   const loadSettings = useCallback(async () => {
@@ -61,10 +62,11 @@ export default function MuacApp() {
     }
   }, [activeProjectPath]);
 
-  // 2. Cargar cuentas
-  const loadAccounts = useCallback(async () => {
+  // 2. Cargar cuentas (con opción de forzar refresco de cuotas a agy)
+  const loadAccounts = useCallback(async (forceRefreshQuota: boolean = false) => {
     try {
-      const res = await fetch('/api/accounts');
+      const url = forceRefreshQuota ? '/api/accounts?refresh=true' : '/api/accounts';
+      const res = await fetch(url);
       const data = await res.json();
       if (data.success) {
         setAccounts(data.accounts || []);
@@ -119,22 +121,64 @@ export default function MuacApp() {
     }
   }, [loadAccounts]);
 
-  // 4. Cargar conversaciones
+  // Manejo de selección persistente de conversación
+  const handleSelectConversation = useCallback((id: string | null) => {
+    setActiveConversationId(id);
+    if (typeof window !== 'undefined') {
+      if (id) {
+        localStorage.setItem('muac_active_convo_id', id);
+        const url = new URL(window.location.href);
+        url.searchParams.set('c', id);
+        window.history.replaceState({}, '', url.toString());
+      } else {
+        localStorage.removeItem('muac_active_convo_id');
+        const url = new URL(window.location.href);
+        url.searchParams.delete('c');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, []);
+
+  // 4. Cargar conversaciones respetando la conversación activa guardada
   const loadConversations = useCallback(async () => {
     try {
       const res = await fetch('/api/conversations');
       const data = await res.json();
       if (data.success) {
-        setConversations(data.conversations || []);
-        if (data.conversations && data.conversations.length > 0 && !activeConversationId) {
-          setActiveConversationId(data.conversations[0].id);
-          setActiveProjectPath(data.conversations[0].projectPath || '');
+        const convos: Conversation[] = data.conversations || [];
+        setConversations(convos);
+
+        if (convos.length > 0) {
+          let targetConvoId = activeConversationId;
+
+          // Si no hay conversación activa en memoria, comprobar URL o localStorage
+          if (!targetConvoId && typeof window !== 'undefined') {
+            const params = new URLSearchParams(window.location.search);
+            const queryConvoId = params.get('c');
+            const storedConvoId = localStorage.getItem('muac_active_convo_id');
+            const candidateId = queryConvoId || storedConvoId;
+
+            if (candidateId && convos.some((c) => c.id === candidateId)) {
+              targetConvoId = candidateId;
+            }
+          }
+
+          // Si sigue sin haber conversación válida seleccionada, tomar la primera
+          if (!targetConvoId || !convos.some((c) => c.id === targetConvoId)) {
+            targetConvoId = convos[0].id;
+          }
+
+          handleSelectConversation(targetConvoId);
+          const activeObj = convos.find((c) => c.id === targetConvoId);
+          if (activeObj?.projectPath) {
+            setActiveProjectPath(activeObj.projectPath);
+          }
         }
       }
     } catch (err) {
       console.error('Error al cargar conversaciones:', err);
     }
-  }, [activeConversationId]);
+  }, [activeConversationId, handleSelectConversation]);
 
   // 5. Cargar mensajes de la conversación activa
   const loadMessages = useCallback(async (conversationId: string) => {
@@ -224,7 +268,7 @@ export default function MuacApp() {
       const data = await res.json();
       if (data.success && data.conversation) {
         setConversations((prev) => [data.conversation, ...prev]);
-        setActiveConversationId(data.conversation.id);
+        handleSelectConversation(data.conversation.id);
         if (data.conversation.projectPath) {
           setActiveProjectPath(data.conversation.projectPath);
         }
@@ -321,7 +365,7 @@ export default function MuacApp() {
       setConversations((prev) => prev.filter((c) => !ids.includes(c.id)));
       if (activeConversationId && ids.includes(activeConversationId)) {
         const remaining = conversations.filter((c) => !ids.includes(c.id));
-        setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
+        handleSelectConversation(remaining.length > 0 ? remaining[0].id : null);
       }
     } catch (err) {
       console.error('Error en eliminación masiva:', err);
@@ -335,7 +379,7 @@ export default function MuacApp() {
       setConversations((prev) => prev.filter((c) => c.id !== id));
       if (activeConversationId === id) {
         const remaining = conversations.filter((c) => c.id !== id);
-        setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
+        handleSelectConversation(remaining.length > 0 ? remaining[0].id : null);
       }
     } catch (err) {
       console.error('Error al eliminar conversación:', err);
@@ -408,15 +452,65 @@ export default function MuacApp() {
     }
   };
 
-  // Manejo de refresco manual de cuotas
-  const handleRefreshQuotas = async () => {
+  // Manejo de refresco de cuotas a agy (manual o automático)
+  const handleRefreshQuotas = useCallback(async () => {
     try {
-      await fetch('/api/quota');
-      await loadAccounts();
+      await fetch('/api/quota', { method: 'POST' });
+      await loadAccounts(true);
     } catch (err) {
       console.error('Error al refrescar cuotas:', err);
     }
+  }, [loadAccounts]);
+
+  // Sincronización de chats de Antigravity con MUAC
+  const handleSyncAntigravity = async () => {
+    setIsSyncingConversations(true);
+    try {
+      const res = await fetch('/api/conversations/sync', { method: 'POST' });
+      const data = await res.json();
+      if (data.success && data.result) {
+        const { conversationsImported, conversationsUpdated, messagesImported } = data.result;
+        setAuthToast({
+          type: 'success',
+          message: `Sincronización completada: ${conversationsImported} nuevas, ${conversationsUpdated} actualizadas (${messagesImported} mensajes).`,
+        });
+        await loadConversations();
+      } else {
+        setAuthToast({
+          type: 'error',
+          message: `Fallo al sincronizar: ${data.error || 'Error desconocido'}`,
+        });
+      }
+    } catch (err) {
+      setAuthToast({
+        type: 'error',
+        message: `Error de conexión: ${(err as Error).message}`,
+      });
+    } finally {
+      setIsSyncingConversations(false);
+    }
   };
+
+  // Intervalo de auto-refresco de cuotas y al enfocar la pestaña
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && !document.hidden && !isStreaming) {
+        handleRefreshQuotas();
+      }
+    }, 45000);
+
+    const handleFocus = () => {
+      if (!isStreaming) {
+        handleRefreshQuotas();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [handleRefreshQuotas, isStreaming]);
 
   // Manejo de actualización de configuración global
   const handleUpdateSettings = async (newSettings: Partial<GlobalSettings>) => {
@@ -568,7 +662,7 @@ export default function MuacApp() {
       // Recargar mensajes persistidos y cuotas actualizadas
       await loadMessages(targetConvoId);
       await loadConversations();
-      await loadAccounts();
+      await handleRefreshQuotas();
     } catch (err) {
       console.error('Error al enviar mensaje:', err);
       alert((err as Error).message || 'Error en la transmisión');
@@ -606,7 +700,7 @@ export default function MuacApp() {
       <Sidebar
         conversations={conversations}
         activeConversationId={activeConversationId}
-        onSelectConversation={(id) => setActiveConversationId(id)}
+        onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
         onDeleteConversation={handleDeleteConversation}
         onTogglePinConversation={handleTogglePinConversation}
@@ -617,6 +711,8 @@ export default function MuacApp() {
           setIsSettingsOpen(true);
         }}
         activeAccountEmail={activeAccount?.email}
+        onSyncAntigravity={handleSyncAntigravity}
+        isSyncing={isSyncingConversations}
       />
 
       {/* Canvas Principal de Conversación */}
@@ -643,6 +739,8 @@ export default function MuacApp() {
         onRotateNext={handleRotateNext}
         verificationAlert={verificationAlert}
         onDismissVerificationAlert={() => setVerificationAlert(null)}
+        onRefreshQuotas={handleRefreshQuotas}
+        activeConversationTitle={conversations.find((c) => c.id === activeConversationId)?.title}
       />
 
       {/* Modal de Configuración Global */}

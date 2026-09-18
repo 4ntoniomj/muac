@@ -469,5 +469,161 @@ test('Multiplataforma: Normalización de rutas de Workspace', () => {
   assert.ok(!normalized.includes('..'), 'La ruta normalizada no debe contener secuencias relativas ..');
 });
 
+// 21. Verificación de Limpieza de Prompts de Antigravity para Sincronización
+test('Antigravity Sync: cleanUserInputContent extrae el prompt limpio sin etiquetas internas', () => {
+  const cleanUserInputContent = (rawContent) => {
+    if (!rawContent) return '';
+    const userReqMatch = rawContent.match(/<USER_REQUEST>([\s\S]*?)<\/USER_REQUEST>/i);
+    if (userReqMatch && userReqMatch[1]) {
+      return userReqMatch[1].trim();
+    }
+    let cleaned = rawContent.replace(/<USER_REQUEST>/gi, '').trim();
+    cleaned = cleaned.replace(/<ADDITIONAL_METADATA>[\s\S]*?<\/ADDITIONAL_METADATA>/gi, '').trim();
+    cleaned = cleaned.replace(/<CONTEXT_SUMMARY>[\s\S]*?<\/CONTEXT_SUMMARY>/gi, '').trim();
+    return cleaned || rawContent.trim();
+  };
+
+  const rawWithTags = `<USER_REQUEST>
+¿Puedes optimizar esta función de búsqueda en TypeScript?
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+{ "timestamp": "2026-09-18T23:59:00Z" }
+</ADDITIONAL_METADATA>`;
+
+  const cleaned = cleanUserInputContent(rawWithTags);
+  assert.equal(cleaned, '¿Puedes optimizar esta función de búsqueda en TypeScript?');
+
+  const plainText = 'Hola, ¿cómo estás?';
+  assert.equal(cleanUserInputContent(plainText), 'Hola, ¿cómo estás?');
+});
+
+// 22. Verificación de Dinamismo de Cuotas según Grupo de Modelo (Gemini vs Claude/GPT)
+test('Quota: Cálculo y selección del porcentaje según el grupo del modelo', () => {
+  const mockQuota = {
+    gemini5hRemaining: 0.25, // 25%
+    geminiWeeklyRemaining: 0.50, // 50%
+    thirdParty5hRemaining: 0.90, // 90%
+    thirdPartyWeeklyRemaining: 0.95, // 95%
+  };
+
+  const getQuotaForModel = (modelGroup, quota) => {
+    const is3p = modelGroup === '3p';
+    return {
+      fiveHour: Math.round((is3p ? quota.thirdParty5hRemaining : quota.gemini5hRemaining) * 100),
+      weekly: Math.round((is3p ? quota.thirdPartyWeeklyRemaining : quota.geminiWeeklyRemaining) * 100),
+    };
+  };
+
+  const geminiResult = getQuotaForModel('gemini', mockQuota);
+  assert.equal(geminiResult.fiveHour, 25);
+  assert.equal(geminiResult.weekly, 50);
+
+  const claudeResult = getQuotaForModel('3p', mockQuota);
+  assert.equal(claudeResult.fiveHour, 90);
+  assert.equal(claudeResult.weekly, 95);
+});
+
+// 23. Verificación de Frescura de Cuota
+test('Quota: Control de frescura con umbral TTL de 30 segundos', () => {
+  const isFresh = (updatedAtIso, maxAgeMs = 30000) => {
+    const age = Date.now() - new Date(updatedAtIso).getTime();
+    return age >= 0 && age < maxAgeMs;
+  };
+
+  const recentTime = new Date(Date.now() - 5000).toISOString(); // 5s atrás
+  assert.equal(isFresh(recentTime), true, 'Un snapshot de 5 segundos debe considerarse fresco');
+
+  const oldTime = new Date(Date.now() - 60000).toISOString(); // 60s atrás
+  assert.equal(isFresh(oldTime), false, 'Un snapshot de 60 segundos debe considerarse caducado');
+});
+
+// 24. Verificación de Formateo de Tiempo de Reset de Cuotas (formatTimeUntilReset)
+test('Quota: formatTimeUntilReset formatea cuentas regresivas y detecta reestablecimiento', () => {
+  const formatTimeUntilReset = (resetTimeIso) => {
+    if (!resetTimeIso) return null;
+    const targetDate = new Date(resetTimeIso);
+    const target = targetDate.getTime();
+    if (isNaN(target)) return null;
+    const now = Date.now();
+    const diffMs = target - now;
+    if (diffMs <= 0) return 'Reestablecido';
+
+    const minutes = Math.floor(diffMs / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+    const timeStr = targetDate.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+
+    if (days > 0) {
+      const dayStr = targetDate.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' });
+      return `en ${days}d ${hours % 24}h (${dayStr} ${timeStr})`;
+    }
+    if (hours > 0) {
+      return `en ${hours}h ${minutes % 60}m (${timeStr})`;
+    }
+    return `en ${minutes}m (${timeStr})`;
+  };
+
+  // Pasado -> Reestablecido
+  const pastTime = new Date(Date.now() - 10000).toISOString();
+  assert.equal(formatTimeUntilReset(pastTime), 'Reestablecido');
+
+  // En 45 minutos -> "en 45m (HH:MM)" o similar
+  const in45m = new Date(Date.now() + 45 * 60 * 1000).toISOString();
+  const res45m = formatTimeUntilReset(in45m);
+  assert.match(res45m, /en 4[45]m/);
+
+  // En 3 horas y 20 minutos -> "en 3h 20m (HH:MM)"
+  const in3h20m = new Date(Date.now() + (3 * 60 + 20) * 60 * 1000).toISOString();
+  const res3h = formatTimeUntilReset(in3h20m);
+  assert.match(res3h, /en 3h (19|20)m/);
+
+  // Null o undefined
+  assert.equal(formatTimeUntilReset(null), null);
+  assert.equal(formatTimeUntilReset(undefined), null);
+});
+
+// 25. Verificación de Detección de Cuenta Agotada (isQuotaExhausted) y Restauración Automática
+test('Quota: isQuotaExhausted detecta agotamiento y revierte al pasar la fecha de reset', () => {
+  const isQuotaExhausted = (fiveHourRemaining, weeklyRemaining, fiveHourResetIso, weeklyResetIso) => {
+    const now = Date.now();
+    const fiveHourResetPassed = fiveHourResetIso ? new Date(fiveHourResetIso).getTime() <= now : false;
+    const weeklyResetPassed = weeklyResetIso ? new Date(weeklyResetIso).getTime() <= now : false;
+
+    const is5hExhausted =
+      fiveHourRemaining !== undefined &&
+      fiveHourRemaining !== null &&
+      fiveHourRemaining <= 0.02 &&
+      !fiveHourResetPassed;
+
+    const isWeeklyExhausted =
+      weeklyRemaining !== undefined &&
+      weeklyRemaining !== null &&
+      weeklyRemaining <= 0.02 &&
+      !weeklyResetPassed;
+
+    return is5hExhausted || isWeeklyExhausted;
+  };
+
+  const futureReset = new Date(Date.now() + 3600000).toISOString();
+  const pastReset = new Date(Date.now() - 3600000).toISOString();
+
+  // Caso 1: Cuenta con cuota normal (80%, 90%)
+  assert.equal(isQuotaExhausted(0.8, 0.9, futureReset, futureReset), false);
+
+  // Caso 2: Cuenta con 5h agotada (0% restante) y reset futuro -> true (tono agotado)
+  assert.equal(isQuotaExhausted(0.0, 0.9, futureReset, futureReset), true);
+
+  // Caso 3: Cuenta con 5h al 0% pero el reset ya pasó -> false (se restaura original)
+  assert.equal(isQuotaExhausted(0.0, 0.9, pastReset, futureReset), false);
+
+  // Caso 4: Cuenta semanal agotada (1% restante) y reset futuro -> true
+  assert.equal(isQuotaExhausted(0.5, 0.01, futureReset, futureReset), true);
+
+  // Caso 5: Cuenta semanal agotada pero reset semanal ya pasó -> false
+  assert.equal(isQuotaExhausted(0.5, 0.01, futureReset, pastReset), false);
+});
+
+
+
 
 

@@ -46,6 +46,8 @@ interface ChatCanvasProps {
   onRotateNext?: () => void;
   verificationAlert?: { error: string; url?: string } | null;
   onDismissVerificationAlert?: () => void;
+  onRefreshQuotas?: () => Promise<void> | void;
+  activeConversationTitle?: string;
 }
 
 export function ChatCanvas({
@@ -68,6 +70,8 @@ export function ChatCanvas({
   onRotateNext,
   verificationAlert,
   onDismissVerificationAlert,
+  onRefreshQuotas,
+  activeConversationTitle,
 }: ChatCanvasProps) {
   const [inputText, setInputText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -136,7 +140,7 @@ export function ChatCanvas({
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-md transition-all"
               >
                 <span>Completar verificación en Google</span>
-                <ExternalLink className="w-3.5 h-3.5" />
+                <ExternalLink className="w-3 h-3" />
               </a>
             )}
             {onDismissVerificationAlert && (
@@ -170,8 +174,8 @@ export function ChatCanvas({
       <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6 max-w-4xl w-full mx-auto">
         {messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 select-none">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-xl shadow-blue-500/20 text-white font-bold text-2xl mb-4">
-              μ
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-xl shadow-blue-500/20 text-white mb-4">
+              <Sparkles className="w-7 h-7 text-white" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">muac · Antigravity Pro</h3>
             <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
@@ -304,6 +308,8 @@ export function ChatCanvas({
                 onSelectAccount={onSelectAccount}
                 onOpenSettings={onOpenSettings}
                 onRotateNext={onRotateNext}
+                activeModelId={activeModelId}
+                onRefreshQuotas={onRefreshQuotas}
               />
               {onUpdateProjectPath && (
                 <WorkspaceSelector
@@ -313,8 +319,8 @@ export function ChatCanvas({
               )}
             </div>
 
-            {/* Aro de Ventana de Contexto (Objetivo #1) */}
-            <div className="flex items-center gap-2">
+            {/* Aro de Ventana de Contexto (Posición Original) */}
+            <div className="flex items-center gap-2 shrink-0">
               <ContextRing usage={contextUsage} modelName={activeModel.name} />
             </div>
           </div>

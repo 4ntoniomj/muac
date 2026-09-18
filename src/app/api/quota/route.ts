@@ -28,3 +28,8 @@ export async function GET(req: Request) {
     return NextResponse.json({ success: false, error: (err as Error).message }, { status: 500 });
   }
 }
+
+export async function POST(req: Request) {
+  return GET(req);
+}
+

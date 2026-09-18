@@ -1,81 +1,190 @@
 # muac (Multi-Account Antigravity Controller)
 
-Interfaz web de chat y consola de agente para Google Antigravity que rota automáticamente entre varias cuentas de Google cuando se agota la cuota de tokens.
+Interfaz web de chat y panel de control para Google Antigravity que conmuta entre múltiples cuentas de Google conforme se agotan las cuotas de tokens.
 
-## Funciones principales
+## Arquitectura del sistema
 
-- Rotación de cuentas: Conmuta a otra cuenta del pool cuando la cuenta activa alcanza el límite de tokens en su ventana de 5 horas o semanal. También permite cambiar de cuenta manualmente en cualquier momento.
-- Indicador de contexto: Un aro sobre la barra de entrada muestra el porcentaje de tokens usados en la conversación y cambia de color según el consumo.
-- Directorio de trabajo local: Selector de carpeta en la barra de mensajes que valida la ruta y comprueba si contiene un repositorio Git.
-- Opciones de agente: Controles para autoaprobar permisos (`--dangerously-skip-permissions`), seleccionar el modo de edición y activar aislamiento en sandbox.
-- Gestión de conversaciones: Permite anclar chats al inicio de la lista, borrarlos con confirmación o realizar acciones en bloque seleccionando varias conversaciones.
-- Autenticación con Google: Inicio de sesión OAuth 2.0 con PKCE forzando el selector de cuentas (`prompt=select_account`), y sincronización con el almacén seguro del sistema operativo (Linux Secret Service, macOS Keychain o Windows Credential Manager).
-- Detección de cuentas pendientes: Si una cuenta requiere verificación en Antigravity, la aplicación detecta el enlace oficial de Google para completarla en una pestaña nueva.
+El proyecto divide su lógica en dominios aislados dentro de `src/`, comunicados mediante contratos tipados en `src/shared/types/`:
 
-## Instalación rápida
-
-El repositorio incluye scripts que comprueban dependencias, instalan paquetes de npm, compilan la aplicación y configuran el servicio del sistema:
-
-En Linux:
-```bash
-./scripts/install-linux.sh
-# O descarga y ejecución en un comando:
-# bash <(curl -fsSL https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-linux.sh)
+```text
+src/
+├── cuentas/          # Ciclo de vida OAuth, tokens y puente con almacenes de claves
+├── rotacion/         # Monitor de cuotas de 5 horas y semanales con selector de pool
+├── chat/             # Conexión con el proceso agy, sincronización y componentes web
+├── configuracion/    # Ajustes persistentes y parámetros de permisos del agente
+├── shared/           # Tipos compartidos, base de datos SQLite y validación de rutas
+└── app/              # Enrutador App Router de Next.js y rutas de API
 ```
 
-En macOS:
-```bash
-./scripts/install-macos.sh
-# O descarga y ejecución en un comando:
-# bash <(curl -fsSL https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-macos.sh)
-```
+La base de datos principal reside en `data/muac.db`, gestionada con el módulo nativo `node:sqlite` de Node.js en modo WAL (`PRAGMA journal_mode = WAL;`) y claves foráneas activas. El archivo se crea con permisos `0600` para restringir el acceso al usuario que ejecuta la aplicación.
 
-En Windows (PowerShell):
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
-# O descarga y ejecución en un comando:
-# irm https://raw.githubusercontent.com/4ntoniomj/muac/dev/scripts/install-windows.ps1 | iex
-```
+## Gestión de cuentas y sincronización de credenciales
+
+muac gestiona múltiples identidades de Google asociadas al entorno de Antigravity.
+
+### Flujo de autenticación OAuth 2.0 PKCE
+
+El inicio de sesión usa el protocolo OAuth 2.0 con PKCE (Proof Key for Code Exchange) y el parámetro `prompt=select_account`, lo que permite vincular cuentas adicionales sin cerrar la sesión actual en el navegador:
+
+1. La interfaz solicita iniciar sesión a `/api/auth/google`.
+2. El servidor genera un verificador criptográfico y redirige a la pantalla de consentimiento de Google con los alcances de Antigravity.
+3. El callback en `/api/auth/callback` intercambia el código de autorización por los tokens de acceso y refresco.
+4. Los tokens se almacenan cifrados en la base de datos local y se sincronizan con el almacén seguro del sistema operativo.
+
+### Sincronización con almacenes seguros
+
+El script `src/cuentas/scripts/keyring_bridge.py` sincroniza las credenciales activas con el gestor de claves nativo antes de ejecutar cualquier comando de Antigravity:
+
+- En Linux interactúa con el demonio Secret Service mediante D-Bus (`org.freedesktop.secrets`).
+- En macOS utiliza la utilidad nativa `/usr/bin/security` para acceder a Keychain.
+- En Windows utiliza Windows Credential Manager.
+- Si la librería `keyring` de Python está presente en el entorno, se emplea como capa unificada.
+
+### Cuentas pendientes de verificación
+
+Cuando una cuenta de Google requiere aceptar términos o verificar el acceso a Antigravity, la aplicación detecta el error emitido por la API de Google, extrae el enlace oficial de verificación y marca la cuenta con el estado correspondiente para resolverlo en el navegador.
+
+## Monitoreo de cuotas y algoritmo de rotación
+
+La rotación automática previene interrupciones durante sesiones de trabajo prolongadas.
+
+### Ventanas de cuota
+
+Cada cuenta monitorea dos ventanas temporales independientes para cada modelo disponible:
+
+- Ventana móvil de 5 horas: cupo de tokens de uso continuo.
+- Ventana semanal: cupo acumulado de 7 días.
+
+Los porcentajes de uso se recalculan periódicamente o tras cada mensaje procesado.
+
+### Reglas de selección de cuenta
+
+Cuando una cuenta activa alcanza un nivel residual inferior o igual al 2% en cualquiera de sus ventanas, el sistema ejecuta los siguientes pasos:
+
+1. Marca la cuenta como agotada y actualiza su registro con la marca de tiempo exacta en que se repondrá el cupo.
+2. En la interfaz, la cuenta pasa a un estado visual atenuado con fondo oscuro.
+3. El algoritmo de selección busca en el pool la cuenta con mayor porcentaje de cuota disponible que no esté bloqueada ni en espera.
+4. Si la cuenta seleccionada estaba agotada pero su tiempo de reinicio ya expiró, el sistema restablece automáticamente su estado al tono original y reinicia sus métricas.
+5. El puente de credenciales actualiza el almacén seguro del sistema con el nuevo token antes de enviar la siguiente solicitud.
+
+Los tiempos restantes para el restablecimiento de 5 horas y semanal se muestran en la barra de controles inferior y en la ventana de ajustes.
+
+## Entorno de chat y sincronización con Antigravity
+
+La interfaz de chat replica el comportamiento del cliente de escritorio de Antigravity, manteniendo sincronizado el historial local.
+
+### Agrupación por proyectos y espacios de trabajo
+
+muac organiza las conversaciones por proyectos y carpetas de trabajo en la barra lateral:
+
+- El sincronizador `src/chat/antigravity-sync.ts` examina las bases de datos de SQLite en `~/.gemini/antigravity/conversation_summaries.db` y `~/.gemini/antigravity-cli/conversation_summaries.db`.
+- Lee la columna `workspace_uris` (array de rutas con esquema `file://`) y extrae la ruta absoluta del proyecto.
+- Si no existe un espacio asignado, asocia la conversación a la carpeta personal (`~`).
+- La barra lateral agrupa las conversaciones bajo carpetas desplegables identificadas con su nombre de directorio y ruta completa en tooltip.
+
+### Indicador de ventana de contexto
+
+El indicador circular de contexto (`ContextRing`) está ubicado en la barra de controles inferior, a la izquierda del selector de cuentas y modelos:
+
+- Calcula el porcentaje consumido frente al límite máximo de tokens del modelo en uso.
+- Cuenta con protección interna contra valores no numéricos o divisiones por cero.
+- Despliega un menú emergente superior con el desglose exacto de tokens utilizados, tokens totales y el porcentaje restante.
+
+### Gestión de conversaciones
+
+- Anclado de chats prioritarios en la parte superior de cada proyecto.
+- Renombrado de títulos de conversación.
+- Eliminación individual con diálogo de confirmación.
+- Selección múltiple para borrado por lotes.
+
+## Permisos y modos de ejecución del agente
+
+El panel de configuración permite ajustar el grado de autonomía del subproceso `agy`.
+
+### Modos globales
+
+- `--dangerously-skip-permissions`: Ejecuta las herramientas sin solicitar confirmación interactiva en terminal.
+- `--mode`: Alterna entre el modo agente autónomo (`agent`) y el modo de consulta directa (`ask`).
+- `--sandbox`: Activa el aislamiento en entorno protegido para comandos de sistema.
+
+### Permisos granulares de herramientas
+
+La configuración desglosa las capacidades del agente en opciones individuales:
+
+- Ejecución en terminal: permiso para invocar comandos de consola (`run_command`).
+- Edición de archivos: permiso para modificar o crear ficheros en el espacio de trabajo (`write_to_file`, `replace_file_content`).
+- Lectura de archivos: permiso para inspeccionar código y carpetas (`view_file`, `list_dir`, `grep_search`).
+- Acceso web: permiso para realizar consultas de búsqueda externa (`search_web`, `read_url_content`).
+- Subagentes: permiso para definir e invocar agentes secundarios (`invoke_subagent`, `define_subagent`).
+
+## Subproceso agy y streaming
+
+El módulo `src/chat/agy-bridge.ts` gestiona la interacción directa con el ejecutable de Antigravity:
+
+1. Invoca el binario `agy` pasando el prompt, el modelo seleccionado y el parámetro `--output-format stream-json`.
+2. Procesa la salida estándar línea a línea interpretando eventos estructurados JSON.
+3. Transmite el texto generado y el estado de ejecución de herramientas al cliente web mediante Server-Sent Events (SSE).
+4. Captura errores de elegibilidad o límites de cuota devueltos por el backend de Google durante la llamada.
+5. Si ocurre un fallo recuperable por cuota, conmuta a la siguiente cuenta disponible del pool sin perder la respuesta acumulada.
 
 ## Servicio en segundo plano
 
-muac incluye un gestor para ejecutarse como demonio o servicio de fondo según el sistema operativo:
+muac incluye un gestor unificado (`scripts/service-manager.js`) para funcionar como demonio del sistema operativo.
 
-- Linux: Servicio de usuario en systemd (`~/.config/systemd/user/muac.service`) con reinicio automático.
+### Plataformas soportadas
+
+- Linux: Servicio de usuario en systemd (`~/.config/systemd/user/muac.service`) con política de reinicio automático.
 - macOS: Agente launchd (`~/Library/LaunchAgents/com.antonio.muac.plist`).
-- Windows: Lanzador en segundo plano en la carpeta de inicio (`shell:startup`) o mediante NSSM.
+- Windows: Acceso directo en la carpeta de inicio de usuario (`shell:startup`) o servicio nativo mediante NSSM.
 
-Comandos de gestión:
+### Comandos de control
 
 | Comando | Acción |
 | :--- | :--- |
-| `npm run service:install` | Registra y activa el servicio en el sistema |
-| `npm run service:start` | Inicia el servicio |
+| `npm run service:install` | Registra y habilita el servicio en el sistema |
+| `npm run service:start` | Inicia la ejecución del proceso en segundo plano |
 | `npm run service:stop` | Detiene el servicio |
-| `npm run service:status` | Muestra el estado del servicio y sus registros |
+| `npm run service:status` | Muestra el estado del proceso y los registros recientes |
 
-## Instalación manual
+## Instalación y despliegue
 
-### Requisitos previos
+### Instalación rápida por script
 
-- Node.js 20 o superior (recomendado Node.js 24, que incluye `node:sqlite`).
-- CLI de Antigravity (`agy`) accesible en la terminal.
-- Python 3.10 o superior (para los puentes del sistema de claves).
+Linux:
+```bash
+./scripts/install-linux.sh
+```
 
-### Configuración del entorno
+macOS:
+```bash
+./scripts/install-macos.sh
+```
 
-Copia la plantilla de variables de entorno y asigna permisos de lectura solo para tu usuario:
+Windows (PowerShell con permisos de ejecución):
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\install-windows.ps1
+```
+
+### Instalación manual
+
+#### 1. Requisitos previos
+
+- Node.js 20 o superior (Node.js 24 recomendado para soporte nativo de `node:sqlite`).
+- CLI de Antigravity (`agy`) instalado y accesible en la variable `PATH`.
+- Python 3.10 o superior con cabeceras de sistema.
+
+#### 2. Configuración de entorno
+
+Copiar la plantilla y asignar permisos restringidos al archivo:
 
 ```bash
 cp .env.example .env
 chmod 600 .env
 ```
 
-Edita `.env` con tu `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET`.
+Completar en `.env` los valores de `GOOGLE_CLIENT_ID` y `GOOGLE_CLIENT_SECRET` obtenidos en Google Cloud Console.
 
-### Linux (Ubuntu, Debian, Fedora, Arch)
-
-1. Dependencias del sistema:
+#### 3. Dependencias según sistema operativo
 
 En Ubuntu o Debian:
 ```bash
@@ -93,7 +202,13 @@ En Arch Linux:
 sudo pacman -S python python-dbus libsecret zenity
 ```
 
-2. Instalación y compilación:
+En macOS (con Homebrew):
+```bash
+brew install node python
+```
+
+#### 4. Compilación y arranque
+
 ```bash
 git clone git@github.com:4ntoniomj/muac.git
 cd muac
@@ -103,86 +218,57 @@ npm test
 npm run build
 ```
 
-3. Ejecución:
-- Desarrollo: `npm run dev`
-- Producción: `npm start`
-
-La aplicación queda disponible en `http://localhost:3000`.
-
-### macOS
-
-1. Dependencias con Homebrew:
+Para entorno de desarrollo con recarga rápida:
 ```bash
-brew install node python
+npm run dev
 ```
 
-2. Instalación y compilación:
+Para producción:
 ```bash
-cd muac
-npm install
-npm run build
 npm start
 ```
 
-### Windows
+La consola web queda disponible en `http://localhost:3000`.
 
-En Windows puedes ejecutar la aplicación de forma nativa o mediante WSL2:
+## Rutas de la API interna
 
-1. Ejecución nativa con PowerShell:
-```powershell
-npm install
-npm run build
-npm start
-```
+| Método | Ruta | Función |
+| :--- | :--- | :--- |
+| `GET` | `/api/cuentas` | Lista de cuentas, estados de cuota y cuenta activa |
+| `POST` | `/api/cuentas` | Registro o actualización de cuenta |
+| `DELETE` | `/api/cuentas` | Eliminación de cuenta del pool |
+| `POST` | `/api/cuentas/activar` | Conmutación manual de cuenta activa |
+| `GET` | `/api/chat` | Lista de conversaciones agrupadas por proyecto |
+| `POST` | `/api/chat` | Envío de mensaje e inicio de streaming con agy |
+| `GET` | `/api/configuracion` | Lectura de configuración global y permisos de agente |
+| `PUT` | `/api/configuracion` | Actualización de parámetros y permisos |
+| `GET` | `/api/auth/google` | Inicio del flujo de autenticación OAuth |
+| `GET` | `/api/auth/callback` | Callback de recepción de credenciales de Google |
 
-2. Ejecución en WSL2 (Ubuntu):
-Instala Ubuntu con `wsl --install -d Ubuntu` y sigue los pasos de la sección de Linux.
+## Seguridad
 
-## Estructura del proyecto
-
-El código está organizado por áreas de negocio:
-
-```text
-src/
-├── cuentas/          # Gestión de cuentas Google, OAuth PKCE y sincronización con almacenes seguros
-├── rotacion/         # Monitoreo de cuotas y cálculo de disponibilidad del pool
-├── chat/             # Conexión con agy, ventana de contexto y componentes de chat
-├── configuracion/    # Ajustes persistentes y parámetros del agente
-├── shared/           # Tipos compartidos, base de datos SQLite y utilidades de ruta
-└── app/              # Rutas de Next.js App Router y endpoints de API
-```
-
-## Detalles técnicos
-
-### Base de datos local
-Utiliza el módulo nativo `node:sqlite` de Node.js en modo WAL (`PRAGMA journal_mode = WAL;`) y claves foráneas activadas. La base de datos reside en `data/muac.db` con permisos `0600` y está excluida del control de versiones.
-
-### Sincronización de credenciales
-El archivo `src/cuentas/scripts/keyring_bridge.py` sincroniza el token activo antes de que el CLI `agy` sea invocado. En Linux interactúa con el Secret Service por D-Bus; en macOS utiliza `/usr/bin/security`; en Windows utiliza Windows Credential Manager. Si la librería `keyring` de Python está instalada, se utiliza como capa unificada.
-
-### Subproceso agy
-El módulo `src/chat/agy-bridge.ts` lanza `agy` con `--output-format stream-json`. Procesa línea a línea los eventos JSON y emite texto y actividades de herramientas mediante Server-Sent Events (SSE). Si Google devuelve un error de elegibilidad, extrae la URL de verificación y conmuta a la siguiente cuenta disponible del pool.
-
-### Seguridad y cabeceras HTTP
-`next.config.mjs` define cabeceras estrictas de seguridad: `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: strict-origin-when-cross-origin`. Las rutas de workspace son verificadas con `src/shared/path-security.ts` para evitar accesos fuera de directorios permitidos.
+- Almacenamiento local restringido: El archivo `.env` y el directorio `data/` están excluidos del repositorio mediante `.gitignore`.
+- Validación de rutas: `src/shared/path-security.ts` valida todas las rutas de trabajo contra ataques de cruce de directorios (`path traversal`).
+- Cabeceras HTTP: `next.config.mjs` aplica políticas de seguridad que incluyen `Content-Security-Policy`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY` y `Referrer-Policy: strict-origin-when-cross-origin`.
+- Manejo de secretos: Las credenciales nunca se exponen al cliente web ni se escriben en los registros del servidor.
 
 ## Pruebas
 
-Ejecuta la suite de pruebas unitarias:
+Ejecutar la suite completa de tests automatizados:
 ```bash
 npm test
 ```
 
-Comprobación de tipos con TypeScript:
+Comprobar los tipos de TypeScript:
 ```bash
 npm run typecheck
 ```
 
-Compilación de producción:
+Compilar para producción:
 ```bash
 npm run build
 ```
 
 ## Licencia
 
-Distribuido bajo la licencia MIT.
+Código distribuido bajo licencia MIT.

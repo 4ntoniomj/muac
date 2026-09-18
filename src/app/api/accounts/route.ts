@@ -10,9 +10,22 @@ import { fetchCurrentQuota, getCachedQuotaSnapshot } from '@/rotacion/quota-moni
 import { getRecentRotationLogs } from '@/rotacion/rotation-engine';
 import type { AccountWithQuota } from '@/shared/types/account';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
+    const urlObj = new URL(req.url);
+    const shouldRefresh = urlObj.searchParams.get('refresh') === 'true';
+
     const accounts = listAccounts();
+    const active = accounts.find((a) => a.isActive);
+
+    // Si se solicita refresh o si la cuenta activa no tiene snapshot reciente, refrescar
+    if (active && (shouldRefresh || !getCachedQuotaSnapshot(active.id))) {
+      try {
+        await fetchCurrentQuota(active.id);
+      } catch (err) {
+        console.error('Error al auto-refrescar cuota en GET /api/accounts:', err);
+      }
+    }
 
     // Enriquecer con snapshots de cuota
     const accountsWithQuota: AccountWithQuota[] = accounts.map((acc) => {

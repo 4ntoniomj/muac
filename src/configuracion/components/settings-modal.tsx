@@ -18,7 +18,9 @@ import {
   History,
   ShieldCheck,
   ExternalLink,
+  Clock,
 } from 'lucide-react';
+import { formatTimeUntilReset, isQuotaExhausted } from '@/shared/quota-utils';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -26,7 +28,7 @@ interface SettingsModalProps {
   accounts: AccountWithQuota[];
   settings: GlobalSettings;
   rotationLogs: RotationEvent[];
-  initialTab?: 'rotacion' | 'cuentas' | 'permisos' | 'general';
+  initialTab?: 'rotacion' | 'cuentas' | 'permisos';
   onUpdateSettings: (newSettings: Partial<GlobalSettings>) => Promise<void>;
   onTogglePool: (accountId: string, inPool: boolean) => Promise<void>;
   onSetActiveAccount: (accountId: string) => Promise<void>;
@@ -49,8 +51,7 @@ export function SettingsModal({
   onImportSystemAccount,
   onRefreshQuotas,
 }: SettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'rotacion' | 'cuentas' | 'permisos' | 'general'>(initialTab);
-  const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt);
+  const [activeTab, setActiveTab] = useState<'rotacion' | 'cuentas' | 'permisos'>(initialTab);
   const [defaultModelId, setDefaultModelId] = useState(settings.defaultModelId);
   const [reasoningEffort, setReasoningEffort] = useState(settings.reasoningEffort);
   const [autoRotate5h, setAutoRotate5h] = useState(settings.autoRotateOn5h);
@@ -60,6 +61,15 @@ export function SettingsModal({
   const [agentMode, setAgentMode] = useState<'default' | 'accept-edits' | 'plan'>(settings.agentMode || 'default');
   const [sandboxMode, setSandboxMode] = useState(settings.sandboxMode ?? false);
   const [defaultProjectPath, setDefaultProjectPath] = useState(settings.defaultProjectPath || '');
+  const [toolPerms, setToolPerms] = useState(
+    settings.allowedPermissions || {
+      terminalCommands: true,
+      fileEdits: true,
+      fileReads: true,
+      webAccess: true,
+      subagents: true,
+    }
+  );
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [manualTokenInput, setManualTokenInput] = useState('');
   const [isImportingToken, setIsImportingToken] = useState(false);
@@ -94,7 +104,6 @@ export function SettingsModal({
 
   const handleSaveGeneral = async () => {
     await onUpdateSettings({
-      systemPrompt,
       defaultModelId,
       reasoningEffort,
       autoRotateOn5h: autoRotate5h,
@@ -104,6 +113,7 @@ export function SettingsModal({
       agentMode,
       sandboxMode,
       defaultProjectPath,
+      allowedPermissions: toolPerms,
     });
     alert('Configuración guardada correctamente.');
   };
@@ -199,20 +209,7 @@ export function SettingsModal({
             }`}
           >
             <ShieldCheck className="w-4 h-4" />
-            <span>Permisos y Modo Agente</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('general')}
-            className={`py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
-              activeTab === 'general'
-                ? 'border-blue-500 text-blue-400'
-                : 'border-transparent text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>Ajustes Generales</span>
+            <span>Permisos y Agente</span>
           </button>
         </div>
 
@@ -258,12 +255,22 @@ export function SettingsModal({
                   accounts.map((acc) => {
                     const q5h = acc.quota ? Math.round(acc.quota.gemini5hRemaining * 100) : 100;
                     const qWeekly = acc.quota ? Math.round(acc.quota.geminiWeeklyRemaining * 100) : 100;
+                    const isExhausted = isQuotaExhausted(
+                      acc.quota?.gemini5hRemaining,
+                      acc.quota?.geminiWeeklyRemaining,
+                      acc.quota?.gemini5hReset,
+                      acc.quota?.geminiWeeklyReset
+                    );
+                    const reset5hText = formatTimeUntilReset(acc.quota?.gemini5hReset);
+                    const resetWeeklyText = formatTimeUntilReset(acc.quota?.geminiWeeklyReset);
 
                     return (
                       <div
                         key={acc.id}
                         className={`p-3.5 rounded-xl border transition-all flex flex-col gap-3 ${
-                          acc.inRotationPool
+                          isExhausted
+                            ? 'bg-slate-950/80 border-slate-800/80 opacity-60 grayscale-[35%]'
+                            : acc.inRotationPool
                             ? 'bg-surface-elevated/80 border-blue-500/40 shadow-sm'
                             : 'bg-surface-elevated/30 border-surface-border opacity-70'
                         }`}
@@ -278,7 +285,14 @@ export function SettingsModal({
                             />
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-semibold text-slate-200">{acc.email}</span>
+                                <span className={`font-semibold ${isExhausted ? 'text-slate-400' : 'text-slate-200'}`}>
+                                  {acc.email}
+                                </span>
+                                {isExhausted && (
+                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-red-500/20 text-red-300 font-mono border border-red-500/30">
+                                    AGOTADA
+                                  </span>
+                                )}
                                 {acc.isActive && (
                                   <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono">
                                     ACTIVA
@@ -323,6 +337,12 @@ export function SettingsModal({
                                 style={{ width: `${q5h}%` }}
                               />
                             </div>
+                            {reset5hText && (
+                              <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-400 font-mono">
+                                <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                                <span>Reset: {reset5hText}</span>
+                              </div>
+                            )}
                           </div>
 
                           <div>
@@ -344,6 +364,12 @@ export function SettingsModal({
                                 style={{ width: `${qWeekly}%` }}
                               />
                             </div>
+                            {resetWeeklyText && (
+                              <div className="flex items-center gap-1 mt-1.5 text-[10px] text-slate-400 font-mono">
+                                <Clock className="w-3 h-3 text-slate-500 shrink-0" />
+                                <span>Reset: {resetWeeklyText}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
                       </div>
@@ -518,19 +544,133 @@ export function SettingsModal({
             </div>
           )}
 
-          {/* 3. Pestaña Permisos y Modo Agente */}
+          {/* 3. Pestaña Permisos y Agente */}
           {activeTab === 'permisos' && (
             <div className="flex flex-col gap-5">
               <div className="p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-800/40 flex items-start gap-3">
                 <ShieldCheck className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
                 <div className="flex-1">
                   <h4 className="font-semibold text-indigo-300 mb-1">
-                    Permisos de Ejecución y Herramientas del Agente
+                    Permisos y Configuración del Agente
                   </h4>
                   <p className="text-slate-400 leading-relaxed text-[11px]">
-                    Configura cómo interactúa Antigravity con las herramientas locales del sistema, lectura y edición de archivos,
-                    y ejecución de comandos en el workspace del proyecto.
+                    Configura el modelo por defecto, nivel de razonamiento, instrucciones de sistema y los permisos
+                    de ejecución con herramientas en el workspace.
                   </p>
+                </div>
+              </div>
+
+              {/* Modelo por defecto y Nivel de Razonamiento */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
+                  <label className="text-slate-200 font-semibold text-xs">
+                    Modelo por defecto de Antigravity:
+                  </label>
+                  <select
+                    value={defaultModelId}
+                    onChange={(e) => setDefaultModelId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs"
+                  >
+                    {ANTIGRAVITY_MODELS.map((m) => (
+                      <option key={m.id} value={m.id}>
+                        {m.name} ({Math.round(m.contextLimit / 1000)}k ctx)
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
+                  <label className="text-slate-200 font-semibold text-xs">
+                    Nivel de Razonamiento (Thinking Effort):
+                  </label>
+                  <select
+                    value={reasoningEffort}
+                    onChange={(e) => setReasoningEffort(e.target.value as 'low' | 'medium' | 'high')}
+                    className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs"
+                  >
+                    <option value="low">Bajo (Low) - Respuestas rápidas</option>
+                    <option value="medium">Medio (Medium) - Razonamiento balanceado</option>
+                    <option value="high">Alto (High) - Pensamiento exhaustivo</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Permisos y Capacidades Seleccionables del Agente */}
+              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-3">
+                <div>
+                  <h5 className="font-semibold text-slate-200 text-xs mb-1">
+                    Permisos y Capacidades del Agente
+                  </h5>
+                  <p className="text-[11px] text-slate-400">
+                    Selecciona individualmente las acciones y herramientas que el agente tiene autorización para ejecutar:
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                    <input
+                      type="checkbox"
+                      checked={toolPerms.terminalCommands}
+                      onChange={(e) => setToolPerms({ ...toolPerms, terminalCommands: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="font-medium text-slate-200 block text-xs">Ejecución en Terminal (Shell)</span>
+                      <span className="text-[10px] text-slate-400">Comandos bash, tests, npm, git y compilaciones del sistema.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                    <input
+                      type="checkbox"
+                      checked={toolPerms.fileEdits}
+                      onChange={(e) => setToolPerms({ ...toolPerms, fileEdits: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="font-medium text-slate-200 block text-xs">Escritura y Edición de Archivos</span>
+                      <span className="text-[10px] text-slate-400">Crear nuevos ficheros, refactorizar código y aplicar cambios.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                    <input
+                      type="checkbox"
+                      checked={toolPerms.fileReads}
+                      onChange={(e) => setToolPerms({ ...toolPerms, fileReads: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="font-medium text-slate-200 block text-xs">Lectura del Workspace</span>
+                      <span className="text-[10px] text-slate-400">Examinar carpetas, búsquedas grep y lectura de archivos.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                    <input
+                      type="checkbox"
+                      checked={toolPerms.webAccess}
+                      onChange={(e) => setToolPerms({ ...toolPerms, webAccess: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="font-medium text-slate-200 block text-xs">Búsqueda y Navegación Web</span>
+                      <span className="text-[10px] text-slate-400">Consultas de información técnica y descarga de URLs externas.</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all md:col-span-2">
+                    <input
+                      type="checkbox"
+                      checked={toolPerms.subagents}
+                      onChange={(e) => setToolPerms({ ...toolPerms, subagents: e.target.checked })}
+                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                    />
+                    <div>
+                      <span className="font-medium text-slate-200 block text-xs">Invocación de Subagentes</span>
+                      <span className="text-[10px] text-slate-400">Delegar tareas en subagentes en paralelo y coordinar ejecución.</span>
+                    </div>
+                  </label>
                 </div>
               </div>
 
@@ -619,72 +759,7 @@ export function SettingsModal({
                   onClick={handleSaveGeneral}
                   className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-md shadow-blue-600/20"
                 >
-                  Guardar Permisos y Entorno
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* 4. Pestaña Ajustes Generales */}
-          {activeTab === 'general' && (
-            <div className="flex flex-col gap-4">
-              <p className="text-[11px] text-slate-400">
-                Estas configuraciones son globales y se mantienen de forma idéntica sin importar con qué
-                cuenta estés operando en cada momento.
-              </p>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1.5">
-                  Modelo por defecto de Antigravity:
-                </label>
-                <select
-                  value={defaultModelId}
-                  onChange={(e) => setDefaultModelId(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500"
-                >
-                  {ANTIGRAVITY_MODELS.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({Math.round(m.contextLimit / 1000)}k ctx)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1.5">
-                  Nivel de Razonamiento (Thinking Effort):
-                </label>
-                <select
-                  value={reasoningEffort}
-                  onChange={(e) => setReasoningEffort(e.target.value as 'low' | 'medium' | 'high')}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500"
-                >
-                  <option value="low">Bajo (Low) - Respuestas más rápidas</option>
-                  <option value="medium">Medio (Medium) - Razonamiento balanceado</option>
-                  <option value="high">Alto (High) - Pensamiento exhaustivo</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-slate-300 font-medium mb-1.5">
-                  Instrucciones de Sistema (System Prompt):
-                </label>
-                <textarea
-                  rows={4}
-                  value={systemPrompt}
-                  onChange={(e) => setSystemPrompt(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-surface-elevated border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 font-mono text-[11px] resize-none"
-                  placeholder="Instrucciones para el asistente..."
-                />
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={handleSaveGeneral}
-                  className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-md shadow-blue-600/20"
-                >
-                  Guardar Preferencias
+                  Guardar Configuración
                 </button>
               </div>
             </div>
