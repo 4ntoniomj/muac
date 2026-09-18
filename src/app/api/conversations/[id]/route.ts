@@ -24,13 +24,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params;
     const body = await req.json();
-    const { title } = body;
+    const { title, projectPath } = body;
 
-    if (!title) {
-      return NextResponse.json({ success: false, error: 'Título requerido' }, { status: 400 });
+    if (title) {
+      updateConversationTitle(id, title);
+    }
+    if (projectPath !== undefined) {
+      const { updateConversationProjectPath } = await import('@/chat/chat-store');
+      updateConversationProjectPath(id, projectPath);
     }
 
-    updateConversationTitle(id, title);
     const updated = getConversation(id);
     return NextResponse.json({ success: true, conversation: updated });
   } catch (err) {

@@ -2,6 +2,7 @@ import crypto from 'node:crypto';
 import type { StoredToken } from '@/shared/types/account';
 
 export const GOOGLE_CLIENT_ID = 'mock_client_id.apps.googleusercontent.com';
+export const GOOGLE_CLIENT_SECRET = 'mock_client_secret';
 export const GOOGLE_SCOPES = [
   'openid',
   'https://www.googleapis.com/auth/userinfo.email',
@@ -23,7 +24,7 @@ export function generatePKCE(): PKCEPair {
   return { verifier, challenge };
 }
 
-export function getGoogleAuthUrl(redirectUri: string, verifier: string): string {
+export function getGoogleAuthUrl(redirectUri: string, verifier: string, state?: string): string {
   const challenge = crypto
     .createHash('sha256')
     .update(verifier)
@@ -43,6 +44,10 @@ export function getGoogleAuthUrl(redirectUri: string, verifier: string): string 
     code_challenge_method: 'S256',
   });
 
+  if (state) {
+    params.set('state', state);
+  }
+
   return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
 }
 
@@ -60,6 +65,7 @@ export async function exchangeCodeForTokens(
 ): Promise<TokenExchangeResult> {
   const params = new URLSearchParams({
     client_id: GOOGLE_CLIENT_ID,
+    client_secret: GOOGLE_CLIENT_SECRET,
     code,
     code_verifier: codeVerifier,
     grant_type: 'authorization_code',

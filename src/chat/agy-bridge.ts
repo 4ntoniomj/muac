@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
+import fs from 'node:fs';
+import path from 'node:path';
 import { getActiveAccount, getAccountById } from '@/cuentas/account-store';
 import { syncStoredTokenToSystem } from '@/cuentas/keyring-sync';
 import { evaluateQuotaExhaustion, executeAutoRotation } from '@/rotacion/rotation-engine';
@@ -21,11 +23,19 @@ export interface StreamEvent {
   };
 }
 
+export interface StreamOptions {
+  projectPath?: string;
+  dangerouslySkipPermissions?: boolean;
+  agentMode?: 'default' | 'accept-edits' | 'plan';
+  sandboxMode?: boolean;
+}
+
 export async function* streamPromptWithAgy(
   prompt: string,
   modelId: string,
   conversationId: string,
-  targetAccountId?: string
+  targetAccountId?: string,
+  options?: StreamOptions
 ): AsyncGenerator<StreamEvent> {
   const settings = getGlobalSettings();
   const model = ANTIGRAVITY_MODELS.find((m) => m.id === modelId) || ANTIGRAVITY_MODELS[0];
@@ -83,7 +93,42 @@ export async function* streamPromptWithAgy(
     }
   }
 
-  // 3. Ejecutar streaming con agy
+  // 3. Resolver directorio de trabajo (Workspace) y banderas de agy
+  let workingDir = process.cwd();
+  const args = [
+    '--print',
+    prompt,
+    '--model',
+    modelId,
+    '--conversation',
+    conversationId,
+    '--output-format',
+    'stream-json',
+  ];
+
+  if (options?.projectPath && fs.existsSync(options.projectPath)) {
+    workingDir = path.resolve(options.projectPath);
+    args.push('--add-dir', workingDir);
+  } else if (settings.defaultProjectPath && fs.existsSync(settings.defaultProjectPath)) {
+    workingDir = path.resolve(settings.defaultProjectPath);
+    args.push('--add-dir', workingDir);
+  }
+
+  const skipPerms = options?.dangerouslySkipPermissions ?? settings.dangerouslySkipPermissions ?? true;
+  if (skipPerms) {
+    args.push('--dangerously-skip-permissions');
+  }
+
+  const mode = options?.agentMode || settings.agentMode;
+  if (mode && mode !== 'default') {
+    args.push('--mode', mode);
+  }
+
+  const sandbox = options?.sandboxMode ?? settings.sandboxMode ?? false;
+  if (sandbox) {
+    args.push('--sandbox');
+  }
+
   let hasAttemptedFailover = false;
   let accumulatedText = '';
   let finalUsage: MessageUsage = {
@@ -93,113 +138,11 @@ export async function* streamPromptWithAgy(
   };
   let duration = 0;
 
-  const runAgyProcess = (): Promise<boolean> => {
-    return new Promise((resolve) => {
-      const child = spawn(
-        'agy',
-        [
-          '--print',
-          prompt,
-          '--model',
-          modelId,
-          '--conversation',
-          conversationId,
-          '--output-format',
-          'stream-json',
-        ],
-        {
-          cwd: process.cwd(),
-          env: process.env,
-        }
-      );
-
-      const rl = readline.createInterface({
-        input: child.stdout,
-        terminal: false,
-      });
-
-      let isQuotaError = false;
-
-      rl.on('line', (line) => {
-        if (!line.trim()) return;
-
-        try {
-          const parsed = JSON.parse(line);
-
-          if (parsed.event === 'step_update' && parsed.step_update) {
-            const step = parsed.step_update;
-            if (step.text_delta) {
-              accumulatedText += step.text_delta;
-              (async () => {
-                // Emisión de delta
-              })();
-            }
-            if (step.usage) {
-              finalUsage = {
-                inputTokens: step.usage.input_tokens || 0,
-                outputTokens: step.usage.output_tokens || 0,
-                thinkingTokens: step.usage.thinking_tokens,
-                totalTokens: step.usage.total_tokens || 0,
-              };
-            }
-          } else if (parsed.event === 'result' && parsed.result) {
-            const res = parsed.result;
-            if (res.duration_seconds) {
-              duration = res.duration_seconds;
-            }
-            if (res.usage) {
-              finalUsage = {
-                inputTokens: res.usage.input_tokens || 0,
-                outputTokens: res.usage.output_tokens || 0,
-                thinkingTokens: res.usage.thinking_tokens,
-                totalTokens: res.usage.total_tokens || 0,
-              };
-            }
-            if (
-              res.status === 'ERROR' &&
-              res.error &&
-              (res.error.includes('exhausted your quota') || res.error.includes('429'))
-            ) {
-              isQuotaError = true;
-            }
-          }
-        } catch {
-          // Línea no JSON o texto de depuración
-          if (line.includes('exhausted your quota') || line.includes('429')) {
-            isQuotaError = true;
-          }
-        }
-      });
-
-      child.on('close', (code) => {
-        resolve(!isQuotaError && code === 0);
-      });
-
-      child.on('error', (err) => {
-        console.error('Error al spawnear agy:', err);
-        resolve(false);
-      });
-    });
-  };
-
-  // Ejecutar con generador asíncrono en tiempo real
-  const child = spawn(
-    'agy',
-    [
-      '--print',
-      prompt,
-      '--model',
-      modelId,
-      '--conversation',
-      conversationId,
-      '--output-format',
-      'stream-json',
-    ],
-    {
-      cwd: process.cwd(),
-      env: process.env,
-    }
-  );
+  // Spawneo del proceso agy en el directorio de trabajo especificado
+  const child = spawn('agy', args, {
+    cwd: workingDir,
+    env: process.env,
+  });
 
   const rl = readline.createInterface({
     input: child.stdout,
@@ -280,7 +223,7 @@ export async function* streamPromptWithAgy(
       if (newTarget) {
         await syncStoredTokenToSystem(newTarget.storedToken);
         // Reintentar recursivamente con la nueva cuenta
-        for await (const subEvent of streamPromptWithAgy(prompt, modelId, conversationId, newTarget.id)) {
+        for await (const subEvent of streamPromptWithAgy(prompt, modelId, conversationId, newTarget.id, options)) {
           yield subEvent;
         }
         return;

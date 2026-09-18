@@ -131,6 +131,25 @@ export async function executeAutoRotation(
   return { success: true, newAccount: nextAccount, event };
 }
 
+export async function rotateToNextAccount(
+  currentAccountId?: string,
+  modelId: string = 'gemini-2.5-pro'
+): Promise<{ success: boolean; newAccount: Account | null; event?: RotationEvent }> {
+  let targetId = currentAccountId;
+  if (!targetId) {
+    const active = (await import('@/cuentas/account-store')).getActiveAccount();
+    if (!active) return { success: false, newAccount: null };
+    targetId = active.id;
+  }
+
+  return executeAutoRotation(
+    targetId,
+    'Rotación manual solicitada por el usuario',
+    modelId,
+    modelId.includes('claude') || modelId.includes('gpt') ? '3p' : 'gemini'
+  );
+}
+
 export function getRecentRotationLogs(limit: number = 20): RotationEvent[] {
   const db = getDatabase();
   const stmt = db.prepare('SELECT * FROM rotation_logs ORDER BY timestamp DESC LIMIT ?');

@@ -8,7 +8,7 @@ import type { Message } from '@/shared/types/chat';
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { conversationId, prompt, modelId, accountId } = body;
+    const { conversationId, prompt, modelId, accountId, projectPath } = body;
 
     if (!conversationId || !prompt) {
       return NextResponse.json(
@@ -23,6 +23,13 @@ export async function POST(req: Request) {
         { success: false, error: 'Conversación no encontrada' },
         { status: 404 }
       );
+    }
+
+    // Si viene projectPath en el request y no en la convo, guardarlo
+    const effectiveProjectPath = projectPath || convo.projectPath;
+    if (projectPath && projectPath !== convo.projectPath) {
+      const { updateConversationProjectPath } = await import('@/chat/chat-store');
+      updateConversationProjectPath(conversationId, projectPath);
     }
 
     const activeAcc = getActiveAccount();
@@ -59,7 +66,8 @@ export async function POST(req: Request) {
             prompt,
             modelId || convo.modelId,
             conversationId,
-            accountId
+            accountId,
+            { projectPath: effectiveProjectPath }
           )) {
             if (event.type === 'delta' && event.text) {
               assistantContent += event.text;

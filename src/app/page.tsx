@@ -19,6 +19,8 @@ export default function MuacApp() {
   const [settings, setSettings] = useState<GlobalSettings>(DEFAULT_SETTINGS);
   const [rotationLogs, setRotationLogs] = useState<RotationEvent[]>([]);
   const [activeModelId, setActiveModelId] = useState<string>(DEFAULT_SETTINGS.defaultModelId);
+  const [activeProjectPath, setActiveProjectPath] = useState<string>('');
+  const [authToast, setAuthToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   // Estados de streaming y modales
   const [isStreaming, setIsStreaming] = useState(false);
@@ -30,7 +32,7 @@ export default function MuacApp() {
   } | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'rotacion' | 'cuentas' | 'general'>('rotacion');
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'rotacion' | 'cuentas' | 'permisos' | 'general'>('rotacion');
 
   // 1. Cargar configuración inicial
   const loadSettings = useCallback(async () => {
@@ -40,11 +42,14 @@ export default function MuacApp() {
       if (data.success && data.settings) {
         setSettings(data.settings);
         setActiveModelId(data.settings.defaultModelId || DEFAULT_SETTINGS.defaultModelId);
+        if (data.settings.defaultProjectPath && !activeProjectPath) {
+          setActiveProjectPath(data.settings.defaultProjectPath);
+        }
       }
     } catch (err) {
       console.error('Error al cargar configuración:', err);
     }
-  }, []);
+  }, [activeProjectPath]);
 
   // 2. Cargar cuentas
   const loadAccounts = useCallback(async () => {
@@ -79,7 +84,32 @@ export default function MuacApp() {
     }
   }, []);
 
-  // 3. Cargar conversaciones
+  // 3. Detectar retornos de OAuth (éxito o error) en la URL
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const authSuccess = params.get('auth_success');
+      const authError = params.get('auth_error');
+      const email = params.get('email');
+
+      if (authSuccess === 'true') {
+        setAuthToast({
+          type: 'success',
+          message: `¡Cuenta Google vinculada correctamente! ${email ? `(${decodeURIComponent(email)})` : ''}`,
+        });
+        loadAccounts();
+        window.history.replaceState({}, '', window.location.pathname);
+      } else if (authError) {
+        setAuthToast({
+          type: 'error',
+          message: `Error al autenticar con Google: ${decodeURIComponent(authError)}`,
+        });
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [loadAccounts]);
+
+  // 4. Cargar conversaciones
   const loadConversations = useCallback(async () => {
     try {
       const res = await fetch('/api/conversations');
@@ -88,6 +118,9 @@ export default function MuacApp() {
         setConversations(data.conversations || []);
         if (data.conversations && data.conversations.length > 0 && !activeConversationId) {
           setActiveConversationId(data.conversations[0].id);
+          if (data.conversations[0].projectPath) {
+            setActiveProjectPath(data.conversations[0].projectPath);
+          }
         }
       }
     } catch (err) {
@@ -95,7 +128,7 @@ export default function MuacApp() {
     }
   }, [activeConversationId]);
 
-  // 4. Cargar mensajes de la conversación activa
+  // 5. Cargar mensajes de la conversación activa
   const loadMessages = useCallback(async (conversationId: string) => {
     try {
       const res = await fetch(`/api/conversations/${conversationId}`);
@@ -104,6 +137,9 @@ export default function MuacApp() {
         setMessages(data.messages || []);
         if (data.conversation?.modelId) {
           setActiveModelId(data.conversation.modelId);
+        }
+        if (data.conversation?.projectPath) {
+          setActiveProjectPath(data.conversation.projectPath);
         }
       }
     } catch (err) {
@@ -134,16 +170,67 @@ export default function MuacApp() {
         body: JSON.stringify({
           title: 'Nueva conversación',
           modelId: activeModelId,
+          projectPath: activeProjectPath || settings.defaultProjectPath,
         }),
       });
       const data = await res.json();
       if (data.success && data.conversation) {
         setConversations((prev) => [data.conversation, ...prev]);
         setActiveConversationId(data.conversation.id);
+        if (data.conversation.projectPath) {
+          setActiveProjectPath(data.conversation.projectPath);
+        }
         setMessages([]);
       }
     } catch (err) {
       console.error('Error al crear conversación:', err);
+    }
+  };
+
+  // Manejo de actualización de ruta de proyecto (Workspace)
+  const handleUpdateProjectPath = async (newPath: string) => {
+    setActiveProjectPath(newPath);
+    if (activeConversationId) {
+      try {
+        await fetch(`/api/conversations/${activeConversationId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectPath: newPath }),
+        });
+        setConversations((prev) =>
+          prev.map((c) => (c.id === activeConversationId ? { ...c, projectPath: newPath } : c))
+        );
+      } catch (err) {
+        console.error('Error al actualizar ruta de proyecto:', err);
+      }
+    }
+  };
+
+  // Manejo de rotación manual directa a la siguiente cuenta del pool
+  const handleRotateNext = async () => {
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'rotate_next', accountId: activeAccountId }),
+      });
+      const data = await res.json();
+      if (data.success && data.newAccount) {
+        setActiveAccountId(data.newAccount.id);
+        await loadAccounts();
+        if (data.event) {
+          setRotationNotice({
+            fromEmail: data.event.fromEmail,
+            toEmail: data.event.toEmail,
+            reason: data.event.reason,
+          });
+        }
+      } else {
+        alert(data.error || 'No se pudo conmutar de cuenta.');
+      }
+    } catch (err) {
+      console.error('Error al iterar cuenta:', err);
+      alert('Error de conexión al rotar');
     }
   };
 
@@ -304,6 +391,7 @@ export default function MuacApp() {
           prompt: text,
           modelId: activeModelId,
           accountId: activeAccountId,
+          projectPath: activeProjectPath,
         }),
       });
 
@@ -367,7 +455,27 @@ export default function MuacApp() {
   const activeAccount = accounts.find((a) => a.id === activeAccountId) || accounts[0];
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-background">
+    <div className="flex h-screen w-screen overflow-hidden bg-background relative">
+      {/* Toast flotante de retroalimentación OAuth */}
+      {authToast && (
+        <div
+          className={`fixed top-4 right-6 z-50 p-3.5 rounded-xl border shadow-2xl flex items-center gap-3 text-xs max-w-md animate-in slide-in-from-top duration-300 backdrop-blur-md ${
+            authToast.type === 'success'
+              ? 'bg-emerald-950/90 border-emerald-500/50 text-emerald-200'
+              : 'bg-red-950/90 border-red-500/50 text-red-200'
+          }`}
+        >
+          <span className="flex-1 font-medium leading-relaxed">{authToast.message}</span>
+          <button
+            type="button"
+            onClick={() => setAuthToast(null)}
+            className="text-slate-400 hover:text-white px-1.5 py-0.5 rounded text-xs transition-all"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Barra Lateral Izquierda */}
       <Sidebar
         conversations={conversations}
@@ -398,6 +506,9 @@ export default function MuacApp() {
           setSettingsInitialTab(tab);
           setIsSettingsOpen(true);
         }}
+        projectPath={activeProjectPath}
+        onUpdateProjectPath={handleUpdateProjectPath}
+        onRotateNext={handleRotateNext}
       />
 
       {/* Modal de Configuración Global */}

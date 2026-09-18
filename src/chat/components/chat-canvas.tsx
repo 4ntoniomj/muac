@@ -8,7 +8,20 @@ import { ModelSelector } from './model-selector';
 import { AccountSelector } from '@/cuentas/components/account-selector';
 import { calculateContextUsage } from '../context-calc';
 import { ANTIGRAVITY_MODELS } from '@/shared/types/model';
-import { Send, Sparkles, Bot, User, AlertCircle, ArrowRight, CornerDownLeft, Clock, Zap } from 'lucide-react';
+import {
+  Send,
+  Sparkles,
+  Bot,
+  User,
+  AlertCircle,
+  ArrowRight,
+  CornerDownLeft,
+  Clock,
+  Zap,
+  FolderOpen,
+  CheckCircle2,
+  Edit3,
+} from 'lucide-react';
 
 interface ChatCanvasProps {
   messages: Message[];
@@ -22,6 +35,9 @@ interface ChatCanvasProps {
   streamingDelta: string;
   rotationNotice: { fromEmail: string; toEmail: string; reason: string } | null;
   onOpenSettings: (tab: 'cuentas' | 'rotacion') => void;
+  projectPath?: string;
+  onUpdateProjectPath?: (path: string) => Promise<void>;
+  onRotateNext?: () => void;
 }
 
 export function ChatCanvas({
@@ -36,8 +52,64 @@ export function ChatCanvas({
   streamingDelta,
   rotationNotice,
   onOpenSettings,
+  projectPath = '',
+  onUpdateProjectPath,
+  onRotateNext,
 }: ChatCanvasProps) {
   const [inputText, setInputText] = useState('');
+  const [isEditingPath, setIsEditingPath] = useState(false);
+  const [tempPath, setTempPath] = useState(projectPath);
+  const [pathValidation, setPathValidation] = useState<{
+    valid: boolean;
+    fileCount?: number;
+    hasGit?: boolean;
+    name?: string;
+    error?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    setTempPath(projectPath);
+    if (projectPath) {
+      validatePath(projectPath);
+    }
+  }, [projectPath]);
+
+  const validatePath = async (p: string) => {
+    if (!p.trim()) {
+      setPathValidation(null);
+      return;
+    }
+    try {
+      const res = await fetch('/api/workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: p.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setPathValidation({
+          valid: true,
+          fileCount: data.fileCount,
+          hasGit: data.hasGit,
+          name: data.name,
+        });
+      } else {
+        setPathValidation({ valid: false, error: data.error });
+      }
+    } catch {
+      setPathValidation({ valid: false, error: 'Error de validación' });
+    }
+  };
+
+  const handleSavePath = async () => {
+    if (onUpdateProjectPath) {
+      await onUpdateProjectPath(tempPath.trim());
+    }
+    setIsEditingPath(false);
+    if (tempPath.trim()) {
+      validatePath(tempPath.trim());
+    }
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -83,6 +155,69 @@ export function ChatCanvas({
 
   return (
     <main className="flex-1 h-full flex flex-col bg-background relative overflow-hidden">
+      {/* Barra de Proyecto / Workspace del Agente */}
+      <div className="px-6 py-2 border-b border-surface-border bg-surface/30 backdrop-blur-sm flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+          {isEditingPath ? (
+            <div className="flex items-center gap-2 flex-1 max-w-xl">
+              <input
+                type="text"
+                value={tempPath}
+                onChange={(e) => setTempPath(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSavePath();
+                  if (e.key === 'Escape') setIsEditingPath(false);
+                }}
+                placeholder="Ruta absoluta del proyecto (ej: /home/usuario/proyecto)..."
+                className="flex-1 px-2.5 py-1 rounded-lg bg-surface-elevated border border-blue-500/50 text-slate-200 text-xs font-mono focus:outline-none"
+                autoFocus
+              />
+              <button
+                type="button"
+                onClick={handleSavePath}
+                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition-all shrink-0"
+              >
+                Fijar ruta
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingPath(false)}
+                className="px-2 py-1 rounded-lg hover:bg-slate-800 text-slate-400 text-xs transition-all shrink-0"
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="text-slate-400 font-medium shrink-0">Workspace Agente:</span>
+              <button
+                type="button"
+                onClick={() => setIsEditingPath(true)}
+                className="font-mono text-slate-300 hover:text-white truncate hover:underline flex items-center gap-1.5"
+                title="Hacer clic para cambiar la ruta de trabajo local"
+              >
+                <span>{projectPath || 'Sin ruta fijada (haz clic para asignar directorio)...'}</span>
+                <Edit3 className="w-3 h-3 text-slate-500 hover:text-slate-300 shrink-0" />
+              </button>
+
+              {pathValidation?.valid && (
+                <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-1.5 py-0.5 rounded font-mono shrink-0">
+                  <CheckCircle2 className="w-3 h-3" />
+                  <span>{pathValidation.name} ({pathValidation.fileCount} archivos)</span>
+                </span>
+              )}
+
+              {pathValidation?.valid === false && (
+                <span className="text-[10px] text-red-400 bg-red-950/40 border border-red-800/40 px-1.5 py-0.5 rounded font-mono shrink-0">
+                  {pathValidation.error || 'Ruta no encontrada'}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Aviso de Rotación Automática Flotante */}
       {rotationNotice && (
         <div className="mx-6 mt-4 p-3 rounded-xl bg-blue-950/60 border border-blue-500/40 text-xs text-blue-200 shadow-xl flex items-center justify-between animate-in slide-in-from-top duration-300">
@@ -223,6 +358,7 @@ export function ChatCanvas({
                 activeAccountId={activeAccountId}
                 onSelectAccount={onSelectAccount}
                 onOpenSettings={onOpenSettings}
+                onRotateNext={onRotateNext}
               />
             </div>
 

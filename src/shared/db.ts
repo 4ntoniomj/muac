@@ -51,7 +51,8 @@ function initDatabaseSchema(db: DatabaseSync): void {
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
       model_id TEXT NOT NULL,
-      total_tokens INTEGER NOT NULL DEFAULT 0
+      total_tokens INTEGER NOT NULL DEFAULT 0,
+      project_path TEXT
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -86,5 +87,18 @@ function initDatabaseSchema(db: DatabaseSync): void {
       reason TEXT NOT NULL,
       model_id TEXT NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS oauth_states (
+      state TEXT PRIMARY KEY,
+      verifier TEXT NOT NULL,
+      created_at TEXT NOT NULL
+    );
   `);
+
+  // Migración segura: asegurar columna project_path en bases de datos existentes
+  try {
+    db.exec('ALTER TABLE conversations ADD COLUMN project_path TEXT;');
+  } catch {
+    // La columna ya existe
+  }
 }

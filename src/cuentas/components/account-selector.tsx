@@ -9,6 +9,7 @@ interface AccountSelectorProps {
   activeAccountId: string;
   onSelectAccount: (accountId: string) => void;
   onOpenSettings: (tab: 'cuentas' | 'rotacion') => void;
+  onRotateNext?: () => void;
 }
 
 export function AccountSelector({
@@ -16,6 +17,7 @@ export function AccountSelector({
   activeAccountId,
   onSelectAccount,
   onOpenSettings,
+  onRotateNext,
 }: AccountSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -149,8 +151,23 @@ export function AccountSelector({
               className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-[11px]"
             >
               <Plus className="w-3 h-3" />
-              <span>Añadir otra cuenta Google</span>
+              <span>Añadir cuenta Google</span>
             </button>
+
+            {onRotateNext && accounts.filter((a) => a.inRotationPool).length > 1 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsOpen(false);
+                  onRotateNext();
+                }}
+                className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-[11px] font-medium bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded border border-amber-500/20 transition-all"
+                title="Conmutar de inmediato a la siguiente cuenta del pool"
+              >
+                <Zap className="w-3 h-3 text-amber-400" />
+                <span>Iterar a siguiente</span>
+              </button>
+            )}
           </div>
         </div>
       )}

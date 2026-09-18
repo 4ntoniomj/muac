@@ -8,6 +8,10 @@ export interface GlobalSettings {
   rotationThresholdFraction: number; // Por defecto 0.05 (5%)
   activeAccountId: string;
   theme: 'dark';
+  dangerouslySkipPermissions: boolean; // Auto-aprobar permisos de herramientas (--dangerously-skip-permissions)
+  agentMode: 'default' | 'accept-edits' | 'plan'; // Modo de ejecución (--mode)
+  sandboxMode: boolean; // Ejecutar en sandbox (--sandbox)
+  defaultProjectPath: string; // Ruta de proyecto local por defecto
 }
 
 export const DEFAULT_SETTINGS: GlobalSettings = {
@@ -19,5 +23,9 @@ export const DEFAULT_SETTINGS: GlobalSettings = {
   autoRotateOnWeekly: true,
   rotationThresholdFraction: 0.05,
   activeAccountId: '',
-  theme: 'dark'
+  theme: 'dark',
+  dangerouslySkipPermissions: true,
+  agentMode: 'default',
+  sandboxMode: false,
+  defaultProjectPath: '',
 };

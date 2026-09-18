@@ -25,7 +25,7 @@ interface SettingsModalProps {
   accounts: AccountWithQuota[];
   settings: GlobalSettings;
   rotationLogs: RotationEvent[];
-  initialTab?: 'rotacion' | 'cuentas' | 'general';
+  initialTab?: 'rotacion' | 'cuentas' | 'permisos' | 'general';
   onUpdateSettings: (newSettings: Partial<GlobalSettings>) => Promise<void>;
   onTogglePool: (accountId: string, inPool: boolean) => Promise<void>;
   onSetActiveAccount: (accountId: string) => Promise<void>;
@@ -48,14 +48,20 @@ export function SettingsModal({
   onImportSystemAccount,
   onRefreshQuotas,
 }: SettingsModalProps) {
-  const [activeTab, setActiveTab] = useState<'rotacion' | 'cuentas' | 'general'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'rotacion' | 'cuentas' | 'permisos' | 'general'>(initialTab);
   const [systemPrompt, setSystemPrompt] = useState(settings.systemPrompt);
   const [defaultModelId, setDefaultModelId] = useState(settings.defaultModelId);
   const [reasoningEffort, setReasoningEffort] = useState(settings.reasoningEffort);
   const [autoRotate5h, setAutoRotate5h] = useState(settings.autoRotateOn5h);
   const [autoRotateWeekly, setAutoRotateWeekly] = useState(settings.autoRotateOnWeekly);
   const [threshold, setThreshold] = useState(settings.rotationThresholdFraction * 100);
+  const [dangerouslySkipPermissions, setDangerouslySkipPermissions] = useState(settings.dangerouslySkipPermissions ?? true);
+  const [agentMode, setAgentMode] = useState<'default' | 'accept-edits' | 'plan'>(settings.agentMode || 'default');
+  const [sandboxMode, setSandboxMode] = useState(settings.sandboxMode ?? false);
+  const [defaultProjectPath, setDefaultProjectPath] = useState(settings.defaultProjectPath || '');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [manualTokenInput, setManualTokenInput] = useState('');
+  const [isImportingToken, setIsImportingToken] = useState(false);
 
   if (!isOpen) return null;
 
@@ -67,8 +73,36 @@ export function SettingsModal({
       autoRotateOn5h: autoRotate5h,
       autoRotateOnWeekly: autoRotateWeekly,
       rotationThresholdFraction: threshold / 100,
+      dangerouslySkipPermissions,
+      agentMode,
+      sandboxMode,
+      defaultProjectPath,
     });
     alert('Configuración guardada correctamente.');
+  };
+
+  const handleManualTokenImport = async () => {
+    if (!manualTokenInput.trim()) return;
+    setIsImportingToken(true);
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'import_token', tokenJson: manualTokenInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert('Token importado exitosamente.');
+        setManualTokenInput('');
+        await onRefreshQuotas();
+      } else {
+        alert(data.error || 'Fallo al importar token');
+      }
+    } catch (err) {
+      alert('Error: ' + (err as Error).message);
+    } finally {
+      setIsImportingToken(false);
+    }
   };
 
   const handleManualRefresh = async () => {
@@ -126,6 +160,19 @@ export function SettingsModal({
           >
             <Users className="w-4 h-4" />
             <span>Cuentas Google OAuth ({accounts.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('permisos')}
+            className={`py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+              activeTab === 'permisos'
+                ? 'border-blue-500 text-blue-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>Permisos y Modo Agente</span>
           </button>
 
           <button
@@ -402,10 +449,145 @@ export function SettingsModal({
                   </div>
                 ))}
               </div>
+
+              {/* Importación manual de Token / JSON */}
+              <div className="p-4 rounded-xl bg-surface-elevated/70 border border-surface-border flex flex-col gap-2.5 mt-2">
+                <h5 className="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                  <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Importar token manualmente (Avanzado)</span>
+                </h5>
+                <p className="text-[11px] text-slate-400">
+                  Si deseas importar un token o credenciales JSON directamente sin pasar por el navegador:
+                </p>
+                <textarea
+                  rows={2}
+                  value={manualTokenInput}
+                  onChange={(e) => setManualTokenInput(e.target.value)}
+                  placeholder='Pega aquí el JSON del token (ej: {"token": {"access_token": "...", "refresh_token": "..."}})...'
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 text-[11px] font-mono resize-none focus:outline-none focus:border-blue-500"
+                />
+                <div>
+                  <button
+                    type="button"
+                    onClick={handleManualTokenImport}
+                    disabled={!manualTokenInput.trim() || isImportingToken}
+                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium transition-all disabled:opacity-50"
+                  >
+                    {isImportingToken ? 'Importando...' : 'Importar Token'}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          {/* 3. Pestaña Ajustes Generales */}
+          {/* 3. Pestaña Permisos y Modo Agente */}
+          {activeTab === 'permisos' && (
+            <div className="flex flex-col gap-5">
+              <div className="p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-800/40 flex items-start gap-3">
+                <ShieldCheck className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
+                <div className="flex-1">
+                  <h4 className="font-semibold text-indigo-300 mb-1">
+                    Permisos de Ejecución y Herramientas del Agente
+                  </h4>
+                  <p className="text-slate-400 leading-relaxed text-[11px]">
+                    Configura cómo interactúa Antigravity con las herramientas locales del sistema, lectura y edición de archivos,
+                    y ejecución de comandos en el workspace del proyecto.
+                  </p>
+                </div>
+              </div>
+
+              {/* 1. Dangerously Skip Permissions */}
+              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex items-center justify-between">
+                <div className="max-w-[80%]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-slate-200">Auto-aprobar permisos de herramientas</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
+                      --dangerously-skip-permissions
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Permite al agente leer y escribir archivos, ejecutar tests y comandos en terminal sin pausar ni esperar confirmación interactiva. Imprescindible para operar como agente autónomo en streaming web.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={dangerouslySkipPermissions}
+                  onChange={(e) => setDangerouslySkipPermissions(e.target.checked)}
+                  className="w-5 h-5 accent-blue-600 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* 2. Modo de Ejecución */}
+              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-slate-200">Modo de Ejecución del Agente</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">
+                    --mode
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400">
+                  Define el comportamiento predeterminado del modelo al abordar tareas de desarrollo:
+                </p>
+                <select
+                  value={agentMode}
+                  onChange={(e) => setAgentMode(e.target.value as 'default' | 'accept-edits' | 'plan')}
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs"
+                >
+                  <option value="default">Por defecto (Ejecución estándar interactiva)</option>
+                  <option value="accept-edits">Aceptar ediciones (accept-edits: aplica cambios de código directamente)</option>
+                  <option value="plan">Modo Planificación (plan: solo elabora planes sin modificar código)</option>
+                </select>
+              </div>
+
+              {/* 3. Sandbox */}
+              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex items-center justify-between">
+                <div className="max-w-[80%]">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-semibold text-slate-200">Ejecución en Sandbox de Terminal</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">
+                      --sandbox
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Aplica restricciones de seguridad a las llamadas de terminal ejecutadas por el agente.
+                  </p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={sandboxMode}
+                  onChange={(e) => setSandboxMode(e.target.checked)}
+                  className="w-5 h-5 accent-blue-600 rounded cursor-pointer"
+                />
+              </div>
+
+              {/* 4. Ruta por defecto para proyectos */}
+              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
+                <span className="font-semibold text-slate-200">Ruta de Proyecto por Defecto (Workspace)</span>
+                <p className="text-[11px] text-slate-400">
+                  Directorio local que se usará como base para nuevas conversaciones si no se especifica uno concreto:
+                </p>
+                <input
+                  type="text"
+                  value={defaultProjectPath}
+                  onChange={(e) => setDefaultProjectPath(e.target.value)}
+                  placeholder="/home/usuario/mi-proyecto"
+                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
+                />
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={handleSaveGeneral}
+                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-md shadow-blue-600/20"
+                >
+                  Guardar Permisos y Entorno
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 4. Pestaña Ajustes Generales */}
           {activeTab === 'general' && (
             <div className="flex flex-col gap-4">
               <p className="text-[11px] text-slate-400">

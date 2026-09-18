@@ -17,13 +17,33 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${protocol}://${host}/?auth_error=${encodeURIComponent(error || 'missing_code')}`);
   }
 
-  // Leer verifier de las cookies de la petición
+  const state = urlObj.searchParams.get('state');
+
+  // Leer verifier de las cookies o de la tabla oauth_states
+  let codeVerifier: string | null = null;
   const cookieHeader = req.headers.get('cookie') || '';
-  const match = cookieHeader.match(/muac_pkce_verifier=([^;]+)/);
-  const codeVerifier = match ? decodeURIComponent(match[1]) : null;
+  const matchVerifier = cookieHeader.match(/muac_pkce_verifier=([^;]+)/);
+  if (matchVerifier) {
+    codeVerifier = decodeURIComponent(matchVerifier[1]);
+  }
+
+  // Fallback si la cookie no llegó: buscar por state en base de datos
+  if (!codeVerifier && state) {
+    try {
+      const { getDatabase } = await import('@/shared/db');
+      const db = getDatabase();
+      const row = db.prepare('SELECT verifier FROM oauth_states WHERE state = ?').get(state) as { verifier: string } | undefined;
+      if (row && row.verifier) {
+        codeVerifier = row.verifier;
+        db.prepare('DELETE FROM oauth_states WHERE state = ?').run(state);
+      }
+    } catch (dbErr) {
+      console.error('Error consultando oauth_states en DB:', dbErr);
+    }
+  }
 
   if (!codeVerifier) {
-    console.error('Verifier PKCE no encontrado en cookies');
+    console.error('Verifier PKCE no encontrado en cookies ni en base de datos');
     return NextResponse.redirect(`${protocol}://${host}/?auth_error=missing_verifier`);
   }
 
@@ -41,8 +61,9 @@ export async function GET(req: Request) {
     // Extraer cuota real inicial
     await fetchCurrentQuota(account.id);
 
-    const res = NextResponse.redirect(`${protocol}://${host}/?auth_success=true`);
+    const res = NextResponse.redirect(`${protocol}://${host}/?auth_success=true&email=${encodeURIComponent(account.email)}`);
     res.cookies.delete('muac_pkce_verifier');
+    res.cookies.delete('muac_pkce_state');
     return res;
   } catch (err) {
     console.error('Fallo en el callback OAuth:', err);

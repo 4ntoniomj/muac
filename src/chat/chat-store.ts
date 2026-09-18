@@ -19,6 +19,7 @@ export function listConversations(): Conversation[] {
     model_id: string;
     total_tokens: number;
     messages_count: number;
+    project_path?: string;
   }>;
 
   return rows.map((r) => ({
@@ -29,6 +30,7 @@ export function listConversations(): Conversation[] {
     modelId: r.model_id,
     totalTokens: r.total_tokens,
     messagesCount: r.messages_count,
+    projectPath: r.project_path || undefined,
   }));
 }
 
@@ -42,6 +44,7 @@ export function getConversation(id: string): Conversation | null {
     updated_at: string;
     model_id: string;
     total_tokens: number;
+    project_path?: string;
   } | undefined;
 
   if (!row) return null;
@@ -53,19 +56,24 @@ export function getConversation(id: string): Conversation | null {
     updatedAt: row.updated_at,
     modelId: row.model_id,
     totalTokens: row.total_tokens,
+    projectPath: row.project_path || undefined,
   };
 }
 
-export function createConversation(title?: string, modelId: string = 'gemini-3.8-flash-high'): Conversation {
+export function createConversation(
+  title?: string,
+  modelId: string = 'gemini-3.8-flash-high',
+  projectPath?: string
+): Conversation {
   const db = getDatabase();
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
   const convoTitle = title || 'Nueva conversación';
 
   db.prepare(`
-    INSERT INTO conversations (id, title, created_at, updated_at, model_id, total_tokens)
-    VALUES (?, ?, ?, ?, ?, 0)
-  `).run(id, convoTitle, now, now, modelId);
+    INSERT INTO conversations (id, title, created_at, updated_at, model_id, total_tokens, project_path)
+    VALUES (?, ?, ?, ?, ?, 0, ?)
+  `).run(id, convoTitle, now, now, modelId, projectPath || null);
 
   return {
     id,
@@ -75,7 +83,18 @@ export function createConversation(title?: string, modelId: string = 'gemini-3.8
     modelId,
     totalTokens: 0,
     messagesCount: 0,
+    projectPath: projectPath || undefined,
   };
+}
+
+export function updateConversationProjectPath(id: string, projectPath: string): boolean {
+  const db = getDatabase();
+  db.prepare('UPDATE conversations SET project_path = ?, updated_at = ? WHERE id = ?').run(
+    projectPath || null,
+    new Date().toISOString(),
+    id
+  );
+  return true;
 }
 
 export function updateConversationTitle(id: string, title: string): boolean {

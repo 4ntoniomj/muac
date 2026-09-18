@@ -13,8 +13,8 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { title, modelId } = body;
-    const convo = createConversation(title, modelId);
+    const { title, modelId, projectPath } = body;
+    const convo = createConversation(title, modelId, projectPath);
     return NextResponse.json({ success: true, conversation: convo });
   } catch (err) {
     return NextResponse.json({ success: false, error: (err as Error).message }, { status: 500 });

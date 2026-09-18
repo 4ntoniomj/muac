@@ -26,6 +26,7 @@ export interface Conversation {
   modelId: string;
   totalTokens: number;
   messagesCount?: number;
+  projectPath?: string;
 }
 
 export interface ContextWindowUsage {
