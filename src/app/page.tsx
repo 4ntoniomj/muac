@@ -30,6 +30,10 @@ export default function MuacApp() {
     toEmail: string;
     reason: string;
   } | null>(null);
+  const [verificationAlert, setVerificationAlert] = useState<{
+    error: string;
+    url?: string;
+  } | null>(null);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<'rotacion' | 'cuentas' | 'permisos' | 'general'>('rotacion');
@@ -234,7 +238,53 @@ export default function MuacApp() {
     }
   };
 
-  // Manejo de eliminación de conversación
+  // Manejo de anclado individual de conversación
+  const handleTogglePinConversation = async (id: string, isPinned?: boolean) => {
+    try {
+      await fetch(`/api/conversations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isPinned }),
+      });
+      await loadConversations();
+    } catch (err) {
+      console.error('Error al cambiar anclado de conversación:', err);
+    }
+  };
+
+  // Manejo de anclado masivo de conversaciones
+  const handleBulkPin = async (ids: string[], isPinned: boolean) => {
+    try {
+      await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: isPinned ? 'bulk_pin' : 'bulk_unpin', ids }),
+      });
+      await loadConversations();
+    } catch (err) {
+      console.error('Error en anclado masivo:', err);
+    }
+  };
+
+  // Manejo de eliminación masiva de conversaciones
+  const handleBulkDelete = async (ids: string[]) => {
+    try {
+      await fetch('/api/conversations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'bulk_delete', ids }),
+      });
+      setConversations((prev) => prev.filter((c) => !ids.includes(c.id)));
+      if (activeConversationId && ids.includes(activeConversationId)) {
+        const remaining = conversations.filter((c) => !ids.includes(c.id));
+        setActiveConversationId(remaining.length > 0 ? remaining[0].id : null);
+      }
+    } catch (err) {
+      console.error('Error en eliminación masiva:', err);
+    }
+  };
+
+  // Manejo de eliminación individual de conversación
   const handleDeleteConversation = async (id: string) => {
     try {
       await fetch(`/api/conversations/${id}`, { method: 'DELETE' });
@@ -381,6 +431,7 @@ export default function MuacApp() {
     setIsStreaming(true);
     setStreamingDelta('');
     setRotationNotice(null);
+    setVerificationAlert(null);
 
     try {
       const response = await fetch('/api/chat/stream', {
@@ -431,7 +482,14 @@ export default function MuacApp() {
               // Completado
             } else if (event.type === 'error') {
               console.error('Error devuelto por stream:', event.error);
-              alert(event.error);
+              if (event.verificationUrl || (event.error && (event.error.includes('eligible') || event.error.includes('verify')))) {
+                setVerificationAlert({
+                  error: event.error,
+                  url: event.verificationUrl,
+                });
+              } else {
+                alert(event.error);
+              }
             }
           } catch (pErr) {
             console.error('Error parseando evento SSE:', pErr);
@@ -483,6 +541,9 @@ export default function MuacApp() {
         onSelectConversation={(id) => setActiveConversationId(id)}
         onNewConversation={handleNewConversation}
         onDeleteConversation={handleDeleteConversation}
+        onTogglePinConversation={handleTogglePinConversation}
+        onBulkPin={handleBulkPin}
+        onBulkDelete={handleBulkDelete}
         onOpenSettings={() => {
           setSettingsInitialTab('rotacion');
           setIsSettingsOpen(true);
@@ -509,6 +570,8 @@ export default function MuacApp() {
         projectPath={activeProjectPath}
         onUpdateProjectPath={handleUpdateProjectPath}
         onRotateNext={handleRotateNext}
+        verificationAlert={verificationAlert}
+        onDismissVerificationAlert={() => setVerificationAlert(null)}
       />
 
       {/* Modal de Configuración Global */}

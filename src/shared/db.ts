@@ -52,7 +52,8 @@ function initDatabaseSchema(db: DatabaseSync): void {
       updated_at TEXT NOT NULL,
       model_id TEXT NOT NULL,
       total_tokens INTEGER NOT NULL DEFAULT 0,
-      project_path TEXT
+      project_path TEXT,
+      is_pinned INTEGER NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS messages (
@@ -95,9 +96,14 @@ function initDatabaseSchema(db: DatabaseSync): void {
     );
   `);
 
-  // Migración segura: asegurar columna project_path en bases de datos existentes
+  // Migraciones seguras: asegurar columnas en bases de datos existentes
   try {
     db.exec('ALTER TABLE conversations ADD COLUMN project_path TEXT;');
+  } catch {
+    // La columna ya existe
+  }
+  try {
+    db.exec('ALTER TABLE conversations ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0;');
   } catch {
     // La columna ya existe
   }

@@ -27,6 +27,7 @@ export interface Conversation {
   totalTokens: number;
   messagesCount?: number;
   projectPath?: string;
+  isPinned?: boolean;
 }
 
 export interface ContextWindowUsage {

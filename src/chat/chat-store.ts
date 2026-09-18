@@ -9,7 +9,7 @@ export function listConversations(): Conversation[] {
     FROM conversations c
     LEFT JOIN messages m ON m.conversation_id = c.id
     GROUP BY c.id
-    ORDER BY c.updated_at DESC
+    ORDER BY c.is_pinned DESC, c.updated_at DESC
   `);
   const rows = stmt.all() as unknown as Array<{
     id: string;
@@ -20,6 +20,7 @@ export function listConversations(): Conversation[] {
     total_tokens: number;
     messages_count: number;
     project_path?: string;
+    is_pinned?: number;
   }>;
 
   return rows.map((r) => ({
@@ -31,6 +32,7 @@ export function listConversations(): Conversation[] {
     totalTokens: r.total_tokens,
     messagesCount: r.messages_count,
     projectPath: r.project_path || undefined,
+    isPinned: Boolean(r.is_pinned),
   }));
 }
 
@@ -45,6 +47,7 @@ export function getConversation(id: string): Conversation | null {
     model_id: string;
     total_tokens: number;
     project_path?: string;
+    is_pinned?: number;
   } | undefined;
 
   if (!row) return null;
@@ -57,6 +60,7 @@ export function getConversation(id: string): Conversation | null {
     modelId: row.model_id,
     totalTokens: row.total_tokens,
     projectPath: row.project_path || undefined,
+    isPinned: Boolean(row.is_pinned),
   };
 }
 
@@ -104,6 +108,45 @@ export function updateConversationTitle(id: string, title: string): boolean {
     new Date().toISOString(),
     id
   );
+  return true;
+}
+
+export function togglePinConversation(id: string, isPinned?: boolean): boolean {
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  if (isPinned !== undefined) {
+    db.prepare('UPDATE conversations SET is_pinned = ?, updated_at = ? WHERE id = ?').run(
+      isPinned ? 1 : 0,
+      now,
+      id
+    );
+  } else {
+    db.prepare('UPDATE conversations SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END, updated_at = ? WHERE id = ?').run(
+      now,
+      id
+    );
+  }
+  return true;
+}
+
+export function bulkPinConversations(ids: string[], isPinned: boolean): boolean {
+  if (!ids || ids.length === 0) return true;
+  const db = getDatabase();
+  const now = new Date().toISOString();
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`UPDATE conversations SET is_pinned = ?, updated_at = ? WHERE id IN (${placeholders})`).run(
+    isPinned ? 1 : 0,
+    now,
+    ...ids
+  );
+  return true;
+}
+
+export function bulkDeleteConversations(ids: string[], isPinned?: boolean): boolean {
+  if (!ids || ids.length === 0) return true;
+  const db = getDatabase();
+  const placeholders = ids.map(() => '?').join(',');
+  db.prepare(`DELETE FROM conversations WHERE id IN (${placeholders})`).run(...ids);
   return true;
 }
 

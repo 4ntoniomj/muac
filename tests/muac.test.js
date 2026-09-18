@@ -159,3 +159,68 @@ test('Permisos: Composición de banderas de ejecución para el subproceso agy', 
   assert.ok(args.includes('--add-dir'), 'Debe incluir directorio de workspace');
   assert.ok(!args.includes('--sandbox'), 'No debe incluir sandbox si está desactivado');
 });
+
+// 7. Verificación de Anclado y Ordenación de Chats
+test('Chats: Priorización y ordenación de chats anclados (isPinned)', () => {
+  const conversations = [
+    { id: 'c1', title: 'Chat antiguo anclado', isPinned: true, updatedAt: '2026-09-18T10:00:00Z' },
+    { id: 'c2', title: 'Chat reciente sin anclar', isPinned: false, updatedAt: '2026-09-18T20:00:00Z' },
+    { id: 'c3', title: 'Chat muy reciente anclado', isPinned: true, updatedAt: '2026-09-18T21:00:00Z' },
+    { id: 'c4', title: 'Chat antiguo sin anclar', isPinned: false, updatedAt: '2026-09-18T08:00:00Z' },
+  ];
+
+  // Ordenar igual que en SQLite: ORDER BY is_pinned DESC, updated_at DESC
+  const sorted = [...conversations].sort((a, b) => {
+    if (a.isPinned !== b.isPinned) {
+      return (b.isPinned ? 1 : 0) - (a.isPinned ? 1 : 0);
+    }
+    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+  });
+
+  assert.equal(sorted[0].id, 'c3', 'El chat anclado más reciente debe ser el primero');
+  assert.equal(sorted[1].id, 'c1', 'El chat anclado más antiguo debe ser el segundo');
+  assert.equal(sorted[2].id, 'c2', 'Los no anclados van después ordenados por fecha');
+  assert.equal(sorted[3].id, 'c4');
+});
+
+// 8. Verificación de Operaciones Masivas (Bulk Pin / Bulk Delete / Select All)
+test('Chats: Selección total y operaciones masivas', () => {
+  let convos = [
+    { id: 'c1', isPinned: false },
+    { id: 'c2', isPinned: false },
+    { id: 'c3', isPinned: false },
+  ];
+
+  // Seleccionar todos
+  const allIds = convos.map((c) => c.id);
+  assert.equal(allIds.length, 3);
+
+  // Bulk Pin sobre todos
+  convos = convos.map((c) => (allIds.includes(c.id) ? { ...c, isPinned: true } : c));
+  assert.ok(convos.every((c) => c.isPinned));
+
+  // Bulk Delete de subset
+  const toDelete = ['c1', 'c2'];
+  convos = convos.filter((c) => !toDelete.includes(c.id));
+  assert.equal(convos.length, 1);
+  assert.equal(convos[0].id, 'c3');
+});
+
+// 9. Verificación de Detección de Error de Elegibilidad y URL de Activación
+test('Elegibilidad agy: Extracción de URL oficial de verificación de Google', () => {
+  const agyErrorOutput = `error: Eligibility check failed: Your current account is not eligible for Antigravity. Verify your account to continue.
+
+Alternatively, try signing in with another personal Google account.
+
+Please verify your account in your browser to continue:
+https://accounts.google.com/signin/continue?sarp=1&scc=1&continue=https://developers.google.com/gemini-code-assist/auth/auth_success_gemini&plt=AKgnsbtL
+{"conversation_id":"","status":"ERROR"}`;
+
+  const isEligibilityError = agyErrorOutput.includes('Eligibility check failed') || agyErrorOutput.includes('not eligible');
+  assert.equal(isEligibilityError, true, 'Debe detectar el error de elegibilidad');
+
+  const match = agyErrorOutput.match(/https:\/\/(?:accounts\.google\.com|developers\.google\.com)[^\s"'<>]+/);
+  assert.ok(match, 'Debe extraer la URL de verificación de Google');
+  assert.match(match[0], /accounts\.google\.com\/signin\/continue/, 'URL debe apuntar al flujo oficial de Google');
+});
+

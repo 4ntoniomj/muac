@@ -16,6 +16,9 @@ export interface StreamEvent {
   usage?: MessageUsage;
   durationSeconds?: number;
   error?: string;
+  verificationUrl?: string;
+  effectiveAccountId?: string;
+  effectiveAccountEmail?: string;
   rotationInfo?: {
     fromEmail: string;
     toEmail: string;
@@ -144,16 +147,29 @@ export async function* streamPromptWithAgy(
     env: process.env,
   });
 
+  let stderrText = '';
+  child.stderr.on('data', (chunk) => {
+    stderrText += chunk.toString();
+  });
+
   const rl = readline.createInterface({
     input: child.stdout,
     terminal: false,
   });
 
   let quotaExhaustedDuringRun = false;
-  let finalResultReceived = false;
+  let eligibilityCheckFailed = false;
+  let lastAgyError = '';
+  let extractedVerificationUrl = '';
 
   for await (const line of rl) {
     if (!line.trim()) continue;
+
+    // Buscar URLs de verificación de Google en el stream
+    const urlMatch = line.match(/https:\/\/(?:accounts\.google\.com|developers\.google\.com)[^\s"'<>]+/);
+    if (urlMatch && !extractedVerificationUrl) {
+      extractedVerificationUrl = urlMatch[0];
+    }
 
     try {
       const parsed = JSON.parse(line);
@@ -173,7 +189,6 @@ export async function* streamPromptWithAgy(
           };
         }
       } else if (parsed.event === 'result' && parsed.result) {
-        finalResultReceived = true;
         const res = parsed.result;
         if (res.duration_seconds) duration = res.duration_seconds;
         if (res.usage) {
@@ -184,38 +199,64 @@ export async function* streamPromptWithAgy(
             totalTokens: res.usage.total_tokens || 0,
           };
         }
-        if (
-          res.status === 'ERROR' &&
-          res.error &&
-          (res.error.includes('exhausted your quota') || res.error.includes('429'))
-        ) {
-          quotaExhaustedDuringRun = true;
+        if (res.status === 'ERROR') {
+          lastAgyError = res.error || 'Error desconocido reportado por agy';
+          if (
+            lastAgyError.includes('exhausted your quota') ||
+            lastAgyError.includes('429')
+          ) {
+            quotaExhaustedDuringRun = true;
+          } else if (lastAgyError.includes('Eligibility check failed') || lastAgyError.includes('not eligible')) {
+            eligibilityCheckFailed = true;
+          }
         }
       }
     } catch {
       if (line.includes('exhausted your quota') || line.includes('429')) {
         quotaExhaustedDuringRun = true;
+      } else if (line.includes('Eligibility check failed') || line.includes('not eligible')) {
+        eligibilityCheckFailed = true;
+        lastAgyError = line;
       }
     }
   }
 
-  // 4. Si la cuota se agotó durante el streaming y está en el pool, ejecutar rotación y reintento
-  if (quotaExhaustedDuringRun && !hasAttemptedFailover && account.inRotationPool) {
+  // Si no se capturó error estructurado pero stderr contiene información de error
+  if (!lastAgyError && stderrText.trim()) {
+    if (stderrText.includes('Eligibility check failed') || stderrText.includes('not eligible')) {
+      eligibilityCheckFailed = true;
+    }
+    const urlMatch = stderrText.match(/https:\/\/(?:accounts\.google\.com|developers\.google\.com)[^\s"'<>]+/);
+    if (urlMatch && !extractedVerificationUrl) {
+      extractedVerificationUrl = urlMatch[0];
+    }
+    lastAgyError = stderrText.trim();
+  }
+
+  // 4. Si la cuota se agotó o la cuenta no es elegible y está en el pool, ejecutar rotación automática
+  const shouldFailover = (quotaExhaustedDuringRun || eligibilityCheckFailed) && !hasAttemptedFailover && account.inRotationPool;
+  if (shouldFailover) {
     hasAttemptedFailover = true;
+    const failoverReason = quotaExhaustedDuringRun
+      ? 'Cuota de 5h o semanal agotada durante el turno'
+      : `Cuenta no elegible o pendiente de verificación (${account.email})`;
+
     const rotResult = await executeAutoRotation(
       account.id,
-      'Cuota de 5h o semanal agotada durante el turno',
+      failoverReason,
       modelId,
       modelGroup
     );
 
-    if (rotResult.success && rotResult.newAccount) {
+    if (rotResult.success && rotResult.newAccount && rotResult.newAccount.id !== account.id) {
       yield {
         type: 'rotated',
         rotationInfo: {
           fromEmail: account.email,
           toEmail: rotResult.newAccount.email,
-          reason: 'Agotamiento de tokens en ejecución. Conmutando cuenta...',
+          reason: quotaExhaustedDuringRun
+            ? 'Agotamiento de tokens en ejecución. Conmutando cuenta...'
+            : 'Cuenta requiere verificación de Google. Conmutando a cuenta disponible...',
         },
       };
 
@@ -231,11 +272,25 @@ export async function* streamPromptWithAgy(
     }
   }
 
-  // 5. Finalización ordinaria
+  // 5. Si hubo un error no recuperable, emitirlo
+  if (lastAgyError && accumulatedText.trim().length === 0) {
+    yield {
+      type: 'error',
+      error: lastAgyError,
+      verificationUrl: extractedVerificationUrl || undefined,
+      effectiveAccountId: account.id,
+      effectiveAccountEmail: account.email,
+    };
+    return;
+  }
+
+  // 6. Finalización ordinaria
   yield {
     type: 'done',
     text: accumulatedText,
     usage: finalUsage,
     durationSeconds: duration,
+    effectiveAccountId: account.id,
+    effectiveAccountEmail: account.email,
   };
 }

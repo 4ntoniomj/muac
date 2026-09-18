@@ -6,6 +6,7 @@ import type { AccountWithQuota } from '@/shared/types/account';
 import { ContextRing } from './context-ring';
 import { ModelSelector } from './model-selector';
 import { AccountSelector } from '@/cuentas/components/account-selector';
+import { WorkspaceSelector } from './workspace-selector';
 import { calculateContextUsage } from '../context-calc';
 import { ANTIGRAVITY_MODELS } from '@/shared/types/model';
 import {
@@ -15,12 +16,11 @@ import {
   User,
   AlertCircle,
   ArrowRight,
+  ExternalLink,
   CornerDownLeft,
   Clock,
   Zap,
-  FolderOpen,
   CheckCircle2,
-  Edit3,
 } from 'lucide-react';
 
 interface ChatCanvasProps {
@@ -38,6 +38,8 @@ interface ChatCanvasProps {
   projectPath?: string;
   onUpdateProjectPath?: (path: string) => Promise<void>;
   onRotateNext?: () => void;
+  verificationAlert?: { error: string; url?: string } | null;
+  onDismissVerificationAlert?: () => void;
 }
 
 export function ChatCanvas({
@@ -55,61 +57,10 @@ export function ChatCanvas({
   projectPath = '',
   onUpdateProjectPath,
   onRotateNext,
+  verificationAlert,
+  onDismissVerificationAlert,
 }: ChatCanvasProps) {
   const [inputText, setInputText] = useState('');
-  const [isEditingPath, setIsEditingPath] = useState(false);
-  const [tempPath, setTempPath] = useState(projectPath);
-  const [pathValidation, setPathValidation] = useState<{
-    valid: boolean;
-    fileCount?: number;
-    hasGit?: boolean;
-    name?: string;
-    error?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    setTempPath(projectPath);
-    if (projectPath) {
-      validatePath(projectPath);
-    }
-  }, [projectPath]);
-
-  const validatePath = async (p: string) => {
-    if (!p.trim()) {
-      setPathValidation(null);
-      return;
-    }
-    try {
-      const res = await fetch('/api/workspace', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: p.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setPathValidation({
-          valid: true,
-          fileCount: data.fileCount,
-          hasGit: data.hasGit,
-          name: data.name,
-        });
-      } else {
-        setPathValidation({ valid: false, error: data.error });
-      }
-    } catch {
-      setPathValidation({ valid: false, error: 'Error de validación' });
-    }
-  };
-
-  const handleSavePath = async () => {
-    if (onUpdateProjectPath) {
-      await onUpdateProjectPath(tempPath.trim());
-    }
-    setIsEditingPath(false);
-    if (tempPath.trim()) {
-      validatePath(tempPath.trim());
-    }
-  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -155,68 +106,43 @@ export function ChatCanvas({
 
   return (
     <main className="flex-1 h-full flex flex-col bg-background relative overflow-hidden">
-      {/* Barra de Proyecto / Workspace del Agente */}
-      <div className="px-6 py-2 border-b border-surface-border bg-surface/30 backdrop-blur-sm flex items-center justify-between text-xs">
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
-          {isEditingPath ? (
-            <div className="flex items-center gap-2 flex-1 max-w-xl">
-              <input
-                type="text"
-                value={tempPath}
-                onChange={(e) => setTempPath(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleSavePath();
-                  if (e.key === 'Escape') setIsEditingPath(false);
-                }}
-                placeholder="Ruta absoluta del proyecto (ej: /home/usuario/proyecto)..."
-                className="flex-1 px-2.5 py-1 rounded-lg bg-surface-elevated border border-blue-500/50 text-slate-200 text-xs font-mono focus:outline-none"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={handleSavePath}
-                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition-all shrink-0"
-              >
-                Fijar ruta
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsEditingPath(false)}
-                className="px-2 py-1 rounded-lg hover:bg-slate-800 text-slate-400 text-xs transition-all shrink-0"
-              >
-                Cancelar
-              </button>
+      {/* Alerta de Elegibilidad / Verificación de Cuenta Google */}
+      {verificationAlert && (
+        <div className="mx-6 mt-4 p-3.5 rounded-xl bg-amber-950/70 border border-amber-500/50 text-xs text-amber-200 shadow-2xl flex items-center justify-between animate-in slide-in-from-top duration-300 backdrop-blur-md">
+          <div className="flex items-start gap-3 flex-1 min-w-0 mr-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <div className="font-semibold text-white mb-0.5">Activación requerida en Google Antigravity</div>
+              <div className="text-[11px] text-amber-300 leading-relaxed break-words">
+                {verificationAlert.error}
+              </div>
             </div>
-          ) : (
-            <div className="flex items-center gap-2 min-w-0 flex-1">
-              <span className="text-slate-400 font-medium shrink-0">Workspace Agente:</span>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {verificationAlert.url && (
+              <a
+                href={verificationAlert.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs shadow-md transition-all"
+              >
+                <span>Completar verificación en Google</span>
+                <ExternalLink className="w-3.5 h-3.5" />
+              </a>
+            )}
+            {onDismissVerificationAlert && (
               <button
                 type="button"
-                onClick={() => setIsEditingPath(true)}
-                className="font-mono text-slate-300 hover:text-white truncate hover:underline flex items-center gap-1.5"
-                title="Hacer clic para cambiar la ruta de trabajo local"
+                onClick={onDismissVerificationAlert}
+                className="px-2 py-1.5 rounded-lg hover:bg-amber-900/40 text-amber-300 text-xs transition-all"
               >
-                <span>{projectPath || 'Sin ruta fijada (haz clic para asignar directorio)...'}</span>
-                <Edit3 className="w-3 h-3 text-slate-500 hover:text-slate-300 shrink-0" />
+                Cerrar
               </button>
-
-              {pathValidation?.valid && (
-                <span className="flex items-center gap-1 text-[10px] text-emerald-400 bg-emerald-950/40 border border-emerald-800/40 px-1.5 py-0.5 rounded font-mono shrink-0">
-                  <CheckCircle2 className="w-3 h-3" />
-                  <span>{pathValidation.name} ({pathValidation.fileCount} archivos)</span>
-                </span>
-              )}
-
-              {pathValidation?.valid === false && (
-                <span className="text-[10px] text-red-400 bg-red-950/40 border border-red-800/40 px-1.5 py-0.5 rounded font-mono shrink-0">
-                  {pathValidation.error || 'Ruta no encontrada'}
-                </span>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Aviso de Rotación Automática Flotante */}
       {rotationNotice && (
@@ -349,9 +275,9 @@ export function ChatCanvas({
       {/* Barra Inferior de Entrada (Input Bar) */}
       <div className="p-4 border-t border-surface-border bg-surface/50 backdrop-blur-md">
         <div className="max-w-4xl w-full mx-auto flex flex-col gap-2">
-          {/* Controles Superiores: Desplegables de Modelos, Cuentas y Aro de Contexto */}
+          {/* Controles Superiores: Desplegables de Modelos, Cuentas, Workspace y Aro de Contexto */}
           <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <ModelSelector selectedModelId={activeModelId} onSelectModel={onSelectModel} />
               <AccountSelector
                 accounts={accounts}
@@ -360,6 +286,12 @@ export function ChatCanvas({
                 onOpenSettings={onOpenSettings}
                 onRotateNext={onRotateNext}
               />
+              {onUpdateProjectPath && (
+                <WorkspaceSelector
+                  projectPath={projectPath}
+                  onUpdateProjectPath={onUpdateProjectPath}
+                />
+              )}
             </div>
 
             {/* Aro de Ventana de Contexto (Objetivo #1) */}

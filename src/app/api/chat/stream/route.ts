@@ -33,6 +33,9 @@ export async function POST(req: Request) {
     }
 
     const activeAcc = getActiveAccount();
+    const { getAccountById } = await import('@/cuentas/account-store');
+    const targetAcc = accountId ? getAccountById(accountId) : null;
+    const effectiveSenderAcc = targetAcc || activeAcc;
 
     // 1. Guardar mensaje del usuario
     const userMsg: Message = {
@@ -41,8 +44,8 @@ export async function POST(req: Request) {
       role: 'user',
       content: prompt,
       createdAt: new Date().toISOString(),
-      accountId: activeAcc?.id,
-      accountEmail: activeAcc?.email,
+      accountId: effectiveSenderAcc?.id,
+      accountEmail: effectiveSenderAcc?.email,
       modelId: modelId || convo.modelId,
     };
     saveMessage(userMsg);
@@ -60,6 +63,8 @@ export async function POST(req: Request) {
         let assistantContent = '';
         let finalUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
         let duration = 0;
+        let responderAccountId = effectiveSenderAcc?.id;
+        let responderAccountEmail = effectiveSenderAcc?.email;
 
         try {
           for await (const event of streamPromptWithAgy(
@@ -72,9 +77,14 @@ export async function POST(req: Request) {
             if (event.type === 'delta' && event.text) {
               assistantContent += event.text;
             }
+            if (event.type === 'rotated' && event.rotationInfo) {
+              responderAccountEmail = event.rotationInfo.toEmail;
+            }
             if (event.type === 'done') {
               if (event.usage) finalUsage = event.usage;
               if (event.durationSeconds) duration = event.durationSeconds;
+              if (event.effectiveAccountId) responderAccountId = event.effectiveAccountId;
+              if (event.effectiveAccountEmail) responderAccountEmail = event.effectiveAccountEmail;
             }
 
             const payload = `data: ${JSON.stringify(event)}\n\n`;
@@ -91,8 +101,8 @@ export async function POST(req: Request) {
               createdAt: new Date().toISOString(),
               durationSeconds: duration,
               usage: finalUsage,
-              accountId: activeAcc?.id,
-              accountEmail: activeAcc?.email,
+              accountId: responderAccountId,
+              accountEmail: responderAccountEmail,
               modelId: modelId || convo.modelId,
             };
             saveMessage(assistantMsg);

@@ -24,7 +24,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   try {
     const { id } = await params;
     const body = await req.json();
-    const { title, projectPath } = body;
+    const { title, projectPath, isPinned } = body;
 
     if (title) {
       updateConversationTitle(id, title);
@@ -32,6 +32,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     if (projectPath !== undefined) {
       const { updateConversationProjectPath } = await import('@/chat/chat-store');
       updateConversationProjectPath(id, projectPath);
+    }
+    if (isPinned !== undefined) {
+      const { togglePinConversation } = await import('@/chat/chat-store');
+      togglePinConversation(id, Boolean(isPinned));
     }
 
     const updated = getConversation(id);
