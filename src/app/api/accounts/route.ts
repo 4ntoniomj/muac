@@ -114,6 +114,66 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: true, account: acc });
     }
 
+    if (action === 'check_verification') {
+      if (!accountId) {
+        return NextResponse.json({ success: false, error: 'accountId requerido' }, { status: 400 });
+      }
+      const { getAccountById, getActiveAccount } = await import('@/cuentas/account-store');
+      const { syncStoredTokenToSystem } = await import('@/cuentas/keyring-sync');
+      const target = getAccountById(accountId);
+      if (!target) {
+        return NextResponse.json({ success: false, error: 'Cuenta no encontrada' }, { status: 404 });
+      }
+
+      const currentActive = getActiveAccount();
+      // Sincronizar cuenta para probar con agy
+      await syncStoredTokenToSystem(target.storedToken);
+
+      const { promisify } = await import('node:util');
+      const { execFile } = await import('node:child_process');
+      const execFileAsync = promisify(execFile);
+
+      let stdout = '';
+      let stderr = '';
+      let isEligible = true;
+      let verificationUrl = `https://accounts.google.com/AccountChooser?Email=${encodeURIComponent(target.email)}&continue=https://developers.google.com/gemini-code-assist/auth/auth_success_gemini`;
+
+      try {
+        const res = await execFileAsync('agy', ['--print', '/usage', '--output-format', 'json'], {
+          timeout: 10000,
+        });
+        stdout = res.stdout;
+      } catch (err: unknown) {
+        const procErr = err as { stdout?: string; stderr?: string; message?: string };
+        stdout = procErr.stdout || '';
+        stderr = procErr.stderr || procErr.message || '';
+      } finally {
+        // Restaurar token activo si era diferente
+        if (currentActive && currentActive.id !== target.id) {
+          await syncStoredTokenToSystem(currentActive.storedToken);
+        }
+      }
+
+      const combined = stdout + '\n' + stderr;
+      if (combined.includes('Eligibility check failed') || combined.includes('not eligible')) {
+        isEligible = false;
+        const match = combined.match(/https:\/\/(?:accounts\.google\.com|developers\.google\.com)[^\s"'<>]+/);
+        if (match) {
+          verificationUrl = match[0];
+          if (!verificationUrl.includes('Email=') && !verificationUrl.includes('authuser=')) {
+            verificationUrl += `&Email=${encodeURIComponent(target.email)}`;
+          }
+        }
+      }
+
+      return NextResponse.json({
+        success: true,
+        eligible: isEligible,
+        email: target.email,
+        verificationUrl: isEligible ? undefined : verificationUrl,
+      });
+    }
+
     if (action === 'delete') {
       if (!accountId) {
         return NextResponse.json({ success: false, error: 'accountId requerido' }, { status: 400 });

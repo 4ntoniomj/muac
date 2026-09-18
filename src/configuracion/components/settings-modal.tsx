@@ -17,6 +17,7 @@ import {
   AlertTriangle,
   History,
   ShieldCheck,
+  ExternalLink,
 } from 'lucide-react';
 
 interface SettingsModalProps {
@@ -62,8 +63,34 @@ export function SettingsModal({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [manualTokenInput, setManualTokenInput] = useState('');
   const [isImportingToken, setIsImportingToken] = useState(false);
+  const [verifyingAccountId, setVerifyingAccountId] = useState<string | null>(null);
 
   if (!isOpen) return null;
+
+  const handleVerifyAccount = async (accId: string) => {
+    setVerifyingAccountId(accId);
+    try {
+      const res = await fetch('/api/accounts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'check_verification', accountId: accId }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        if (data.eligible) {
+          alert(`¡La cuenta ${data.email} ya está verificada y activa en Google Antigravity!`);
+        } else if (data.verificationUrl) {
+          window.open(data.verificationUrl, '_blank', 'noopener,noreferrer');
+        }
+      } else {
+        alert(data.error || 'No se pudo comprobar la elegibilidad.');
+      }
+    } catch {
+      alert('Error de conexión al verificar elegibilidad.');
+    } finally {
+      setVerifyingAccountId(null);
+    }
+  };
 
   const handleSaveGeneral = async () => {
     await onUpdateSettings({
@@ -424,6 +451,21 @@ export function SettingsModal({
                     </div>
 
                     <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleVerifyAccount(acc.id)}
+                        disabled={verifyingAccountId === acc.id}
+                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-[11px] font-medium transition-all"
+                        title="Verificar o activar cuenta en Google en una pestaña nueva"
+                      >
+                        {verifyingAccountId === acc.id ? (
+                          <RefreshCw className="w-3 h-3 animate-spin text-blue-400" />
+                        ) : (
+                          <ExternalLink className="w-3 h-3 text-blue-400" />
+                        )}
+                        <span>Activar en Google</span>
+                      </button>
+
                       {!acc.isActive && (
                         <button
                           type="button"
