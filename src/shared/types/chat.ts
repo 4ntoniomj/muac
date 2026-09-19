@@ -8,7 +8,7 @@ export interface MessageUsage {
 export interface Attachment {
   id: string;
   name: string;
-  type: 'image' | 'video' | 'file';
+  type: 'image' | 'video' | 'audio' | 'file';
   mimeType: string;
   size: number;
   url: string;

@@ -35,6 +35,11 @@ import {
   Plus,
   Mic,
   MicOff,
+  Eye,
+  Copy,
+  Check,
+  Volume2,
+  Play,
 } from 'lucide-react';
 
 interface ChatCanvasProps {
@@ -95,15 +100,21 @@ export function ChatCanvas({
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
+  const [previewFileContent, setPreviewFileContent] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
   const isRecordingRef = useRef(false);
   const baseTextRef = useRef('');
 
-  // Limpieza al desmontar para no dejar el micrófono abierto
+  // Limpieza al desmontar para no dejar micrófonos abiertos
   useEffect(() => {
     return () => {
       isRecordingRef.current = false;
@@ -112,16 +123,68 @@ export function ChatCanvas({
           recognitionRef.current.stop();
         } catch {}
       }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
+        } catch {}
+      }
     };
   }, []);
 
-  // Manejo de grabación continua por micrófono (dictado sin límite)
-  const handleToggleRecording = () => {
+  // Cargar contenido textual para la vista previa cuando se selecciona un archivo
+  useEffect(() => {
+    if (!previewAttachment) {
+      setPreviewFileContent(null);
+      return;
+    }
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPreviewAttachment(null);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+
+    const isTextual =
+      previewAttachment.type === 'file' &&
+      (previewAttachment.mimeType?.startsWith('text/') ||
+        previewAttachment.mimeType?.includes('json') ||
+        previewAttachment.mimeType?.includes('javascript') ||
+        previewAttachment.mimeType?.includes('typescript') ||
+        previewAttachment.name.match(/\.(txt|md|json|ts|js|py|html|css|yaml|yml|sh|env)$/i));
+
+    if (isTextual) {
+      setIsLoadingPreview(true);
+      fetch(previewAttachment.url)
+        .then((res) => res.text())
+        .then((text) => setPreviewFileContent(text))
+        .catch((err) => {
+          console.error('Error cargando vista previa de archivo:', err);
+          setPreviewFileContent('No se pudo cargar el contenido del archivo.');
+        })
+        .finally(() => setIsLoadingPreview(false));
+    } else {
+      setPreviewFileContent(null);
+    }
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [previewAttachment]);
+
+  // Manejo de grabación continua por micrófono (dictado sin límite con fallback universal)
+  const handleToggleRecording = async () => {
     if (isRecording) {
       isRecordingRef.current = false;
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
+        } catch {}
+        recognitionRef.current = null;
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        try {
+          mediaRecorderRef.current.stop();
         } catch {}
       }
       setIsRecording(false);
@@ -132,63 +195,127 @@ export function ChatCanvas({
       typeof window !== 'undefined' &&
       ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
-    if (!SpeechRecognition) {
-      alert('Tu navegador no soporta la API de reconocimiento de voz. Usa Chrome, Edge u otro navegador compatible.');
+    // 1. Si el navegador cuenta con la API SpeechRecognition (Chrome, Edge, Chromium)
+    if (SpeechRecognition) {
+      try {
+        const recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'es-ES';
+
+        baseTextRef.current = inputText;
+        isRecordingRef.current = true;
+        setIsRecording(true);
+
+        recognition.onresult = (event: any) => {
+          let transcript = '';
+          for (let i = 0; i < event.results.length; i++) {
+            transcript += event.results[i][0].transcript;
+          }
+          const base = baseTextRef.current.trim();
+          const separator = base ? ' ' : '';
+          const newText = base + separator + transcript.trim();
+          setInputText(newText);
+
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto';
+            textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.warn('Speech recognition warning:', event.error);
+          if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+            alert('Permiso de micrófono denegado. Permite el acceso al micrófono en tu navegador.');
+            isRecordingRef.current = false;
+            setIsRecording(false);
+          }
+        };
+
+        recognition.onend = () => {
+          if (isRecordingRef.current) {
+            try {
+              recognition.start();
+            } catch {}
+          } else {
+            setIsRecording(false);
+          }
+        };
+
+        recognitionRef.current = recognition;
+        recognition.start();
+        return;
+      } catch (err) {
+        console.warn('Fallo al iniciar SpeechRecognition, usando grabadora nativa MediaRecorder:', err);
+      }
+    }
+
+    // 2. Fallback universal para navegadores sin SpeechRecognition (Firefox, Brave, WebViews)
+    if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+      alert('Tu navegador no permite la captura de audio.');
       return;
     }
 
     try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = 'es-ES';
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mimeType = typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : typeof MediaRecorder !== 'undefined' && MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : '';
 
-      baseTextRef.current = inputText;
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach((track) => track.stop());
+        const audioBlob = new Blob(audioChunksRef.current, {
+          type: mediaRecorder.mimeType || 'audio/webm',
+        });
+        if (audioBlob.size > 0) {
+          setIsUploading(true);
+          try {
+            const formData = new FormData();
+            const ext = mediaRecorder.mimeType?.includes('ogg') ? 'ogg' : 'webm';
+            const audioFile = new File(
+              [audioBlob],
+              `nota_de_voz_${Date.now()}.${ext}`,
+              { type: mediaRecorder.mimeType || 'audio/webm' }
+            );
+            formData.append('files', audioFile);
+
+            const res = await fetch('/api/files/upload', {
+              method: 'POST',
+              body: formData,
+            });
+            const data = await res.json();
+            if (data.success && data.attachments && data.attachments.length > 0) {
+              setPendingAttachments((prev) => [...prev, ...data.attachments]);
+              if (!inputText.trim()) {
+                setInputText('Escucha la nota de voz adjunta y responde a mi consulta.');
+              }
+            }
+          } catch (uploadErr) {
+            console.error('Error al subir nota de voz grabada:', uploadErr);
+          } finally {
+            setIsUploading(false);
+          }
+        }
+      };
+
+      mediaRecorder.start(500);
       isRecordingRef.current = true;
       setIsRecording(true);
-
-      recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = 0; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
-        }
-        const base = baseTextRef.current.trim();
-        const separator = base ? ' ' : '';
-        const newText = base + separator + transcript.trim();
-        setInputText(newText);
-
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto';
-          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
-        }
-      };
-
-      recognition.onerror = (event: any) => {
-        console.warn('Speech recognition error:', event.error);
-        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
-          alert('Permiso de micrófono denegado. Permite el acceso al micrófono en el navegador.');
-          isRecordingRef.current = false;
-          setIsRecording(false);
-        }
-      };
-
-      recognition.onend = () => {
-        // Sin límite de grabación: reanudar automáticamente si el usuario no ha parado
-        if (isRecordingRef.current) {
-          try {
-            recognition.start();
-          } catch {
-            // Ya activo
-          }
-        } else {
-          setIsRecording(false);
-        }
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
     } catch (err) {
-      console.error('Error al iniciar reconocimiento de voz:', err);
+      console.error('Error accediendo al micrófono con MediaRecorder:', err);
+      alert('No se pudo acceder al micrófono. Por favor concede permisos de micrófono en el navegador.');
       isRecordingRef.current = false;
       setIsRecording(false);
     }
@@ -540,48 +667,91 @@ export function ChatCanvas({
                       : 'bg-surface-elevated border border-surface-border text-slate-200 rounded-tl-sm'
                   }`}
                 >
-                  {/* Adjuntos del Mensaje (Fotos, Videos, Archivos) */}
+                  {/* Adjuntos del Mensaje (Fotos, Videos, Audios, Archivos) */}
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="flex flex-col gap-2 pt-0.5">
                       {msg.attachments.map((att) => (
                         <div key={att.id} className="rounded-xl overflow-hidden">
                           {att.type === 'image' ? (
-                            <img
-                              src={att.url}
-                              alt={att.name}
-                              className="max-h-72 max-w-full rounded-xl object-contain bg-black/40 border border-white/10 cursor-pointer hover:opacity-95 transition-opacity"
-                              onClick={() => window.open(att.url, '_blank')}
-                            />
+                            <div className="relative group cursor-pointer" onClick={() => setPreviewAttachment(att)}>
+                              <img
+                                src={att.url}
+                                alt={att.name}
+                                className="max-h-72 max-w-full rounded-xl object-contain bg-black/40 border border-white/10 hover:opacity-95 transition-opacity"
+                              />
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2 text-white text-xs font-medium">
+                                <Eye className="w-4 h-4" />
+                                <span>Ver imagen completa</span>
+                              </div>
+                            </div>
                           ) : att.type === 'video' ? (
-                            <video
-                              src={att.url}
-                              controls
-                              className="max-h-72 max-w-full rounded-xl bg-black border border-white/10"
-                            />
-                          ) : (
-                            <a
-                              href={att.url}
-                              download={att.name}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className={`flex items-center gap-3 p-2.5 rounded-xl border transition-all ${
+                            <div className="relative">
+                              <video
+                                src={att.url}
+                                controls
+                                className="max-h-72 max-w-full rounded-xl bg-black border border-white/10"
+                              />
+                            </div>
+                          ) : att.type === 'audio' ? (
+                            <div
+                              className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                                 isUser
-                                  ? 'bg-blue-700/60 border-blue-500/40 hover:bg-blue-700 text-white'
-                                  : 'bg-surface border-surface-border hover:border-blue-500/50 hover:bg-surface-elevated text-slate-200'
+                                  ? 'bg-blue-700/70 border-blue-500/50 text-white'
+                                  : 'bg-surface border-surface-border text-slate-200'
                               }`}
                             >
-                              <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
-                                <FileText className="w-4 h-4" />
+                              <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
+                                <Volume2 className="w-5 h-5" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs font-semibold truncate">{att.name}</div>
-                                <div className="text-[10px] opacity-75">
-                                  {att.lineCount ? `${att.lineCount} líneas • ` : ''}
-                                  {formatFileSize(att.size)}
+                                <div className="text-[10px] opacity-75 font-mono">
+                                  {formatFileSize(att.size)} • Nota de voz
+                                </div>
+                                <audio controls src={att.url} className="w-full h-8 mt-1.5 accent-blue-500" />
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-all ${
+                                isUser
+                                  ? 'bg-blue-700/60 border-blue-500/40 text-white'
+                                  : 'bg-surface border-surface-border text-slate-200'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 min-w-0 flex-1">
+                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
+                                  <FileText className="w-4 h-4" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="text-xs font-semibold truncate">{att.name}</div>
+                                  <div className="text-[10px] opacity-75">
+                                    {att.lineCount ? `${att.lineCount} líneas • ` : ''}
+                                    {formatFileSize(att.size)}
+                                  </div>
                                 </div>
                               </div>
-                              <Download className="w-3.5 h-3.5 shrink-0 opacity-80 hover:opacity-100" />
-                            </a>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => setPreviewAttachment(att)}
+                                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                                  title="Previsualizar contenido"
+                                >
+                                  <Eye className="w-3.5 h-3.5" />
+                                </button>
+                                <a
+                                  href={att.url}
+                                  download={att.name}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                                  title="Descargar archivo"
+                                >
+                                  <Download className="w-3.5 h-3.5" />
+                                </a>
+                              </div>
+                            </div>
                           )}
                         </div>
                       ))}
@@ -719,37 +889,84 @@ export function ChatCanvas({
 
           {/* Contenedor de Redacción con Chips de Adjuntos */}
           <div className="flex flex-col p-2 rounded-2xl bg-surface border border-surface-border focus-within:border-blue-500/70 focus-within:ring-1 focus-within:ring-blue-500/40 transition-all shadow-inner gap-2">
-            {/* Chips de Adjuntos Pendientes */}
+            {/* Previsualizaciones de Adjuntos Pendientes */}
             {pendingAttachments.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap px-1 pt-1 border-b border-surface-border/50 pb-2">
+              <div className="flex items-center gap-2 flex-wrap px-1 pt-1 border-b border-surface-border/50 pb-2.5">
                 {pendingAttachments.map((att) => (
                   <div
                     key={att.id}
-                    className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-surface-elevated border border-surface-border text-xs text-slate-200 shadow-sm animate-in fade-in"
+                    className="group relative flex items-center gap-2 p-1.5 pr-2.5 rounded-xl bg-surface-elevated border border-surface-border hover:border-slate-600 shadow-sm transition-all animate-in fade-in"
                   >
                     {att.type === 'image' ? (
-                      <ImageIcon className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                      <div
+                        className="relative w-10 h-10 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 cursor-pointer group-hover:border-blue-500/50 transition-colors"
+                        onClick={() => setPreviewAttachment(att)}
+                        title="Clic para previsualizar imagen en grande"
+                      >
+                        <img
+                          src={att.url}
+                          alt={att.name}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                        />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <Eye className="w-3.5 h-3.5 text-white" />
+                        </div>
+                      </div>
                     ) : att.type === 'video' ? (
-                      <Film className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                      <div
+                        className="relative w-10 h-10 rounded-lg overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center cursor-pointer group-hover:border-purple-500/60 transition-colors"
+                        onClick={() => setPreviewAttachment(att)}
+                        title="Clic para previsualizar video"
+                      >
+                        <Film className="w-4 h-4 text-purple-400" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                          <Play className="w-3 h-3 text-white fill-white" />
+                        </div>
+                      </div>
+                    ) : att.type === 'audio' ? (
+                      <div
+                        className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 cursor-pointer group-hover:border-amber-500/60 transition-colors"
+                        onClick={() => setPreviewAttachment(att)}
+                        title="Clic para escuchar audio"
+                      >
+                        <Volume2 className="w-4 h-4" />
+                      </div>
                     ) : (
-                      <FileText className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                      <div
+                        className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 cursor-pointer group-hover:border-emerald-500/60 transition-colors"
+                        onClick={() => setPreviewAttachment(att)}
+                        title="Clic para ver contenido del archivo"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </div>
                     )}
 
-                    <span className="truncate max-w-[160px] font-medium text-[11px]">{att.name}</span>
-                    {att.lineCount ? (
-                      <span className="text-[10px] text-slate-400 font-mono">({att.lineCount} lín)</span>
-                    ) : (
-                      <span className="text-[10px] text-slate-400 font-mono">({formatFileSize(att.size)})</span>
-                    )}
+                    <div className="flex flex-col min-w-0 max-w-[150px]">
+                      <span className="text-[11px] font-medium text-slate-200 truncate">{att.name}</span>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        {att.lineCount ? `${att.lineCount} lín • ` : ''}
+                        {formatFileSize(att.size)}
+                      </span>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAttachment(att.id)}
-                      className="text-slate-400 hover:text-white ml-0.5"
-                      title="Quitar archivo"
-                    >
-                      <X className="w-3 h-3" />
-                    </button>
+                    <div className="flex items-center gap-0.5 ml-1">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewAttachment(att)}
+                        className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                        title="Previsualizar"
+                      >
+                        <Eye className="w-3 h-3" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveAttachment(att.id)}
+                        className="p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                        title="Quitar"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -845,6 +1062,160 @@ export function ChatCanvas({
           </div>
         </div>
       </div>
+
+      {/* Modal / Lightbox de Vista Previa de Adjuntos (Fotos, Videos, Audios, Archivos) */}
+      {previewAttachment && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setPreviewAttachment(null)}
+        >
+          <div
+            className="relative w-full max-w-4xl max-h-[90vh] bg-surface-elevated border border-surface-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Barra superior del modal */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-border/80 bg-surface/80">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                  {previewAttachment.type === 'image' && <ImageIcon className="w-4 h-4" />}
+                  {previewAttachment.type === 'video' && <Film className="w-4 h-4" />}
+                  {previewAttachment.type === 'audio' && <Volume2 className="w-4 h-4" />}
+                  {previewAttachment.type === 'file' && <FileText className="w-4 h-4" />}
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xs font-semibold text-slate-100 truncate">{previewAttachment.name}</h3>
+                  <p className="text-[11px] text-slate-400 font-mono">
+                    {previewAttachment.lineCount ? `${previewAttachment.lineCount} líneas • ` : ''}
+                    {formatFileSize(previewAttachment.size)}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {previewFileContent && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(previewFileContent);
+                      setIsCopied(true);
+                      setTimeout(() => setIsCopied(false), 2000);
+                    }}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-surface-border hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors"
+                    title="Copiar contenido"
+                  >
+                    {isCopied ? (
+                      <>
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                        <span className="text-emerald-400 font-medium">Copiado</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" />
+                        <span>Copiar</span>
+                      </>
+                    )}
+                  </button>
+                )}
+
+                <a
+                  href={previewAttachment.url}
+                  download={previewAttachment.name}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors shadow-sm"
+                  title="Descargar archivo original"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Descargar</span>
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewAttachment(null)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-1"
+                  title="Cerrar vista previa (Esc)"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido del modal */}
+            <div className="flex-1 overflow-auto p-4 flex items-center justify-center min-h-[260px] bg-black/30">
+              {previewAttachment.type === 'image' && (
+                <div className="relative max-h-[75vh] flex items-center justify-center">
+                  <img
+                    src={previewAttachment.url}
+                    alt={previewAttachment.name}
+                    className="max-h-[75vh] max-w-full rounded-xl object-contain shadow-lg border border-white/10"
+                  />
+                </div>
+              )}
+
+              {previewAttachment.type === 'video' && (
+                <div className="w-full flex items-center justify-center">
+                  <video
+                    src={previewAttachment.url}
+                    controls
+                    autoPlay
+                    className="max-h-[75vh] max-w-full rounded-xl shadow-lg border border-white/10 bg-black"
+                  />
+                </div>
+              )}
+
+              {previewAttachment.type === 'audio' && (
+                <div className="w-full max-w-md p-8 rounded-2xl bg-surface border border-surface-border flex flex-col items-center gap-5 text-center shadow-xl">
+                  <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-inner">
+                    <Volume2 className="w-8 h-8 animate-pulse" />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-100">{previewAttachment.name}</h4>
+                    <p className="text-xs text-slate-400 font-mono mt-1">Nota de voz • {formatFileSize(previewAttachment.size)}</p>
+                  </div>
+                  <audio controls autoPlay src={previewAttachment.url} className="w-full mt-2 accent-amber-500" />
+                </div>
+              )}
+
+              {previewAttachment.type === 'file' && (
+                <div className="w-full h-full flex flex-col">
+                  {isLoadingPreview ? (
+                    <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
+                      <div className="w-6 h-6 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                      <span className="text-xs">Cargando vista previa...</span>
+                    </div>
+                  ) : previewFileContent !== null ? (
+                    <div className="relative w-full max-h-[70vh] overflow-auto rounded-xl bg-slate-950 p-4 border border-slate-800 text-slate-200 font-mono text-xs leading-relaxed select-text">
+                      <pre className="whitespace-pre-wrap break-words">{previewFileContent}</pre>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
+                      <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <FileText className="w-7 h-7" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-slate-100 mb-1">{previewAttachment.name}</h4>
+                        <p className="text-xs text-slate-400 max-w-sm">
+                          Este archivo binario no tiene vista previa de texto directo. Puedes descargarlo para visualizarlo en tu equipo.
+                        </p>
+                      </div>
+                      <a
+                        href={previewAttachment.url}
+                        download={previewAttachment.name}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition-colors"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Descargar archivo</span>
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 
@@ -860,15 +1231,25 @@ export function ChatCanvas({
       if (match.index > lastIndex) {
         parts.push(rawContent.slice(lastIndex, match.index));
       }
-      const alt = match[1];
-      const src = match[2];
+      const currentAlt = match[1];
+      const currentSrc = match[2];
+      const currentIdx = match.index;
       parts.push(
-        <div key={match.index} className="my-2">
+        <div key={currentIdx} className="my-2">
           <img
-            src={src}
-            alt={alt}
+            src={currentSrc}
+            alt={currentAlt}
             className="max-h-72 max-w-full rounded-xl object-contain bg-black/40 border border-white/10 cursor-pointer hover:opacity-95 transition-opacity shadow-md"
-            onClick={() => window.open(src, '_blank')}
+            onClick={() =>
+              setPreviewAttachment({
+                id: `inline_${currentIdx}`,
+                name: currentAlt || 'imagen_chat.png',
+                type: 'image',
+                url: currentSrc,
+                size: 0,
+                mimeType: 'image/png',
+              })
+            }
           />
         </div>
       );

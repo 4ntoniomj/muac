@@ -867,8 +867,58 @@ test('Dictado por Voz: Configuración continua y autoreinicio sin límite de tie
   assert.equal(restartedCount, 2, 'No debe reiniciar cuando el usuario ha detenido la grabación');
 });
 
+// 35. Verificación de Detección de Tipos de Adjuntos (image, video, audio, file)
+test('Adjuntos: Detección universal de tipos (image, video, audio, file) y MIME types', () => {
+  const determineFileType = (filename, mimeType) => {
+    if (mimeType && mimeType.startsWith('image/')) return 'image';
+    if (mimeType && mimeType.startsWith('video/')) return 'video';
+    if (mimeType && mimeType.startsWith('audio/')) return 'audio';
+    const ext = filename.split('.').pop()?.toLowerCase() || '';
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) return 'image';
+    if (['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v'].includes(ext)) return 'video';
+    if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'weba'].includes(ext)) return 'audio';
+    return 'file';
+  };
 
+  assert.equal(determineFileType('captura.png', 'image/png'), 'image');
+  assert.equal(determineFileType('demo.mp4', 'video/mp4'), 'video');
+  assert.equal(determineFileType('nota_voz.webm', 'audio/webm'), 'audio');
+  assert.equal(determineFileType('audio.mp3', 'application/octet-stream'), 'audio');
+  assert.equal(determineFileType('codigo.ts', 'text/plain'), 'file');
+  assert.equal(determineFileType('documento.pdf', 'application/pdf'), 'file');
+});
 
+// 36. Verificación de Fallback de Reconocimiento de Voz a MediaRecorder
+test('Micrófono: Fallback transparente a MediaRecorder cuando SpeechRecognition no está soportado', () => {
+  const selectAudioStrategy = (hasSpeechRecognition, hasMediaDevices) => {
+    if (hasSpeechRecognition) {
+      return 'speech_recognition_live_text';
+    }
+    if (hasMediaDevices) {
+      return 'media_recorder_voice_attachment';
+    }
+    return 'unsupported';
+  };
 
+  // En Chrome / Edge (SpeechRecognition nativo)
+  assert.equal(
+    selectAudioStrategy(true, true),
+    'speech_recognition_live_text',
+    'Debe usar reconocimiento de voz en tiempo real si está disponible'
+  );
 
+  // En Firefox / Brave / WebViews (Sin SpeechRecognition pero con MediaDevices)
+  assert.equal(
+    selectAudioStrategy(false, true),
+    'media_recorder_voice_attachment',
+    'Debe hacer fallback transparente a MediaRecorder sin lanzar error al usuario'
+  );
+
+  // En entornos sin acceso a medios
+  assert.equal(
+    selectAudioStrategy(false, false),
+    'unsupported',
+    'Detecta si el navegador carece de ambos'
+  );
+});
 

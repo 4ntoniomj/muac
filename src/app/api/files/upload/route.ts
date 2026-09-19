@@ -18,12 +18,14 @@ function ensureUploadsDir() {
   }
 }
 
-function determineFileType(fileName: string, mimeType: string): 'image' | 'video' | 'file' {
+function determineFileType(fileName: string, mimeType: string): 'image' | 'video' | 'audio' | 'file' {
   if (mimeType.startsWith('image/')) return 'image';
   if (mimeType.startsWith('video/')) return 'video';
+  if (mimeType.startsWith('audio/')) return 'audio';
   const ext = path.extname(fileName).toLowerCase().replace(/^\./, '');
   if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(ext)) return 'image';
   if (['mp4', 'webm', 'mov', 'mkv', 'avi', 'm4v'].includes(ext)) return 'video';
+  if (['mp3', 'wav', 'ogg', 'm4a', 'aac', 'flac', 'weba'].includes(ext)) return 'audio';
   return 'file';
 }
 
