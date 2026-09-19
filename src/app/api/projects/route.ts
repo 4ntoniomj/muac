@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server';
 import { listProjects, createProject } from '@/chat/project-store';
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const projects = listProjects();
+    const { searchParams } = new URL(req.url);
+    const sortBy = (searchParams.get('sortBy') as any) || 'recent';
+    const projects = listProjects(sortBy);
     return NextResponse.json({ success: true, projects });
   } catch (err) {
     console.error('Error al listar proyectos:', err);

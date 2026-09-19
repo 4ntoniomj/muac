@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { getActiveAccount, getAccountById } from '@/cuentas/account-store';
 import { syncStoredTokenToSystem } from '@/cuentas/keyring-sync';
 import { evaluateQuotaExhaustion, executeAutoRotation } from '@/rotacion/rotation-engine';
@@ -46,6 +47,57 @@ export interface StreamOptions {
   agentMode?: 'default' | 'accept-edits' | 'plan';
   sandboxMode?: boolean;
   reasoningEffort?: 'low' | 'medium' | 'high';
+  signal?: AbortSignal;
+  skipConversationArg?: boolean;
+}
+
+/**
+ * Asegura que los archivos de la trayectoria existan en la carpeta de antigravity-cli
+ * sincronizándolos desde la carpeta de Antigravity Desktop (IDE) si fuera necesario.
+ */
+export function ensureTrajectoryInCli(conversationId: string): boolean {
+  if (!conversationId) return false;
+  const home = os.homedir();
+  const cliConvoPath = path.join(home, '.gemini', 'antigravity-cli', 'conversations', `${conversationId}.db`);
+  if (fs.existsSync(cliConvoPath)) {
+    return true;
+  }
+
+  const ideConvoPath = path.join(home, '.gemini', 'antigravity', 'conversations', `${conversationId}.db`);
+  if (fs.existsSync(ideConvoPath)) {
+    try {
+      const cliDir = path.join(home, '.gemini', 'antigravity-cli', 'conversations');
+      if (!fs.existsSync(cliDir)) {
+        fs.mkdirSync(cliDir, { recursive: true });
+      }
+      fs.copyFileSync(ideConvoPath, cliConvoPath);
+
+      if (fs.existsSync(`${ideConvoPath}-shm`)) {
+        fs.copyFileSync(`${ideConvoPath}-shm`, `${cliConvoPath}-shm`);
+      }
+      if (fs.existsSync(`${ideConvoPath}-wal`)) {
+        fs.copyFileSync(`${ideConvoPath}-wal`, `${cliConvoPath}-wal`);
+      }
+
+      // Sincronizar directorio de brain si existe
+      const ideBrain = path.join(home, '.gemini', 'antigravity', 'brain', conversationId);
+      const cliBrain = path.join(home, '.gemini', 'antigravity-cli', 'brain', conversationId);
+      if (fs.existsSync(ideBrain) && !fs.existsSync(cliBrain)) {
+        fs.cpSync(ideBrain, cliBrain, { recursive: true });
+      }
+
+      // Sincronizar anotaciones si existen
+      const ideAnnot = path.join(home, '.gemini', 'antigravity', 'annotations', `${conversationId}.pbtxt`);
+      const cliAnnot = path.join(home, '.gemini', 'antigravity-cli', 'annotations', `${conversationId}.pbtxt`);
+      if (fs.existsSync(ideAnnot) && !fs.existsSync(cliAnnot)) {
+        fs.copyFileSync(ideAnnot, cliAnnot);
+      }
+      return true;
+    } catch (err) {
+      console.error(`Error sincronizando trayectoria ${conversationId} hacia antigravity-cli:`, err);
+    }
+  }
+  return false;
 }
 
 export async function* streamPromptWithAgy(
@@ -120,16 +172,20 @@ export async function* streamPromptWithAgy(
     effectivePrompt = `[System Instructions / Instrucciones de Sistema]:\n${settings.systemPrompt.trim()}\n\n${prompt}`;
   }
 
+  const trajectoryExists = ensureTrajectoryInCli(conversationId);
+
   const args = [
     '--print',
     effectivePrompt,
     '--model',
     model.id,
-    '--conversation',
-    conversationId,
-    '--output-format',
-    'stream-json',
   ];
+
+  if (!options?.skipConversationArg && trajectoryExists) {
+    args.push('--conversation', conversationId);
+  }
+
+  args.push('--output-format', 'stream-json');
 
   // Añadir esfuerzo de razonamiento si el modelo lo soporta
   if (model.effortSupported) {
@@ -169,6 +225,10 @@ export async function* streamPromptWithAgy(
     args.push('--sandbox');
   }
 
+  if (options?.signal?.aborted) {
+    return;
+  }
+
   let hasAttemptedFailover = false;
   let accumulatedText = '';
   let finalUsage: MessageUsage = {
@@ -186,6 +246,20 @@ export async function* streamPromptWithAgy(
     shell: agyCmd.shell,
   });
 
+  const onAbort = () => {
+    try {
+      if (!child.killed) {
+        child.kill('SIGTERM');
+      }
+    } catch {
+      // Ignorar error al matar proceso terminado
+    }
+  };
+
+  if (options?.signal) {
+    options.signal.addEventListener('abort', onAbort, { once: true });
+  }
+
   let stderrText = '';
   child.stderr.on('data', (chunk) => {
     stderrText += chunk.toString();
@@ -201,93 +275,102 @@ export async function* streamPromptWithAgy(
   let lastAgyError = '';
   let extractedVerificationUrl = '';
 
-  for await (const line of rl) {
-    if (!line.trim()) continue;
+  try {
+    for await (const line of rl) {
+      if (options?.signal?.aborted) {
+        break;
+      }
+      if (!line.trim()) continue;
 
-    // Buscar URLs de verificación de Google en el stream
-    const urlMatch = line.match(/https:\/\/(?:accounts\.google\.com|developers\.google\.com)[^\s"'<>]+/);
-    if (urlMatch && !extractedVerificationUrl) {
-      extractedVerificationUrl = urlMatch[0];
-    }
+      // Buscar URLs de verificación de Google en el stream
+      const urlMatch = line.match(/https:\/\/(?:accounts\.google\.com|developers\.google\.com)[^\s"'<>]+/);
+      if (urlMatch && !extractedVerificationUrl) {
+        extractedVerificationUrl = urlMatch[0];
+      }
 
-    try {
-      const parsed = JSON.parse(line);
+      try {
+        const parsed = JSON.parse(line);
 
-      if (parsed.event === 'step_update' && parsed.step_update) {
-        const step = parsed.step_update;
+        if (parsed.event === 'step_update' && parsed.step_update) {
+          const step = parsed.step_update;
 
-        // Emitir actividad de herramienta (ej. list_dir, run_command, view_file, etc.)
-        if (step.step_type === 'tool') {
-          yield {
-            type: 'activity',
-            activity: {
-              stepIndex: step.step_index,
-              stepType: 'tool',
-              state: step.state || 'ACTIVE',
-              toolName: step.tool_name || step.tool_info?.name || 'tool',
-              toolParameters: step.tool_info?.parameters,
-              toolOutput: typeof step.tool_info?.output === 'string'
-                ? step.tool_info.output.slice(0, 300)
-                : undefined,
-              durationSeconds: step.duration_seconds,
-            },
-          };
-        }
+          // Emitir actividad de herramienta (ej. list_dir, run_command, view_file, etc.)
+          if (step.step_type === 'tool') {
+            yield {
+              type: 'activity',
+              activity: {
+                stepIndex: step.step_index,
+                stepType: 'tool',
+                state: step.state || 'ACTIVE',
+                toolName: step.tool_name || step.tool_info?.name || 'tool',
+                toolParameters: step.tool_info?.parameters,
+                toolOutput: typeof step.tool_info?.output === 'string'
+                  ? step.tool_info.output.slice(0, 300)
+                  : undefined,
+                durationSeconds: step.duration_seconds,
+              },
+            };
+          }
 
-        // Emitir actividad de razonamiento inicial
-        if (step.step_type === 'agent_response' && !step.text_delta && step.state === 'ACTIVE') {
-          yield {
-            type: 'activity',
-            activity: {
-              stepIndex: step.step_index,
-              stepType: 'thinking',
-              state: 'ACTIVE',
-            },
-          };
-        }
+          // Emitir actividad de razonamiento inicial
+          if (step.step_type === 'agent_response' && !step.text_delta && step.state === 'ACTIVE') {
+            yield {
+              type: 'activity',
+              activity: {
+                stepIndex: step.step_index,
+                stepType: 'thinking',
+                state: 'ACTIVE',
+              },
+            };
+          }
 
-        if (step.text_delta) {
-          accumulatedText += step.text_delta;
-          yield { type: 'delta', text: step.text_delta };
-        }
-        if (step.usage) {
-          finalUsage = {
-            inputTokens: step.usage.input_tokens || 0,
-            outputTokens: step.usage.output_tokens || 0,
-            thinkingTokens: step.usage.thinking_tokens,
-            totalTokens: step.usage.total_tokens || 0,
-          };
-        }
-      } else if (parsed.event === 'result' && parsed.result) {
-        const res = parsed.result;
-        if (res.duration_seconds) duration = res.duration_seconds;
-        if (res.usage) {
-          finalUsage = {
-            inputTokens: res.usage.input_tokens || 0,
-            outputTokens: res.usage.output_tokens || 0,
-            thinkingTokens: res.usage.thinking_tokens,
-            totalTokens: res.usage.total_tokens || 0,
-          };
-        }
-        if (res.status === 'ERROR') {
-          lastAgyError = res.error || 'Error desconocido reportado por agy';
-          if (
-            lastAgyError.includes('exhausted your quota') ||
-            lastAgyError.includes('429')
-          ) {
-            quotaExhaustedDuringRun = true;
-          } else if (lastAgyError.includes('Eligibility check failed') || lastAgyError.includes('not eligible')) {
-            eligibilityCheckFailed = true;
+          if (step.text_delta) {
+            accumulatedText += step.text_delta;
+            yield { type: 'delta', text: step.text_delta };
+          }
+          if (step.usage) {
+            finalUsage = {
+              inputTokens: step.usage.input_tokens || 0,
+              outputTokens: step.usage.output_tokens || 0,
+              thinkingTokens: step.usage.thinking_tokens,
+              totalTokens: step.usage.total_tokens || 0,
+            };
+          }
+        } else if (parsed.event === 'result' && parsed.result) {
+          const res = parsed.result;
+          if (res.duration_seconds) duration = res.duration_seconds;
+          if (res.usage) {
+            finalUsage = {
+              inputTokens: res.usage.input_tokens || 0,
+              outputTokens: res.usage.output_tokens || 0,
+              thinkingTokens: res.usage.thinking_tokens,
+              totalTokens: res.usage.total_tokens || 0,
+            };
+          }
+          if (res.status === 'ERROR') {
+            lastAgyError = res.error || 'Error desconocido reportado por agy';
+            if (
+              lastAgyError.includes('exhausted your quota') ||
+              lastAgyError.includes('429')
+            ) {
+              quotaExhaustedDuringRun = true;
+            } else if (lastAgyError.includes('Eligibility check failed') || lastAgyError.includes('not eligible')) {
+              eligibilityCheckFailed = true;
+            }
           }
         }
+      } catch {
+        if (line.includes('exhausted your quota') || line.includes('429')) {
+          quotaExhaustedDuringRun = true;
+        } else if (line.includes('Eligibility check failed') || line.includes('not eligible')) {
+          eligibilityCheckFailed = true;
+          lastAgyError = line;
+        }
       }
-    } catch {
-      if (line.includes('exhausted your quota') || line.includes('429')) {
-        quotaExhaustedDuringRun = true;
-      } else if (line.includes('Eligibility check failed') || line.includes('not eligible')) {
-        eligibilityCheckFailed = true;
-        lastAgyError = line;
-      }
+    }
+  } finally {
+    if (options?.signal) {
+      options.signal.removeEventListener('abort', onAbort);
     }
   }
 
@@ -303,7 +386,36 @@ export async function* streamPromptWithAgy(
     lastAgyError = stderrText.trim();
   }
 
-  // 4. Si la cuota se agotó o la cuenta no es elegible y está en el pool, ejecutar rotación automática
+  // 4. Detección de "trajectory not found": auto-heal automático
+  const isTrajectoryNotFound =
+    (lastAgyError && lastAgyError.includes('trajectory not found')) ||
+    stderrText.includes('trajectory not found');
+
+  if (isTrajectoryNotFound && !options?.skipConversationArg) {
+    console.warn(`[muac] Trayectoria ${conversationId} no encontrada por agy. Recuperando de forma automática...`);
+    for await (const subEvent of streamPromptWithAgy(prompt, modelId, conversationId, targetAccountId, {
+      ...options,
+      skipConversationArg: true,
+    })) {
+      yield subEvent;
+    }
+    return;
+  }
+
+  // Si el usuario canceló la respuesta activamente
+  if (options?.signal?.aborted) {
+    yield {
+      type: 'done',
+      text: accumulatedText,
+      usage: finalUsage,
+      durationSeconds: duration,
+      effectiveAccountId: account.id,
+      effectiveAccountEmail: account.email,
+    };
+    return;
+  }
+
+  // 5. Si la cuota se agotó o la cuenta no es elegible y está en el pool, ejecutar rotación automática
   const shouldFailover = (quotaExhaustedDuringRun || eligibilityCheckFailed) && !hasAttemptedFailover && account.inRotationPool;
   if (shouldFailover) {
     hasAttemptedFailover = true;
@@ -342,7 +454,7 @@ export async function* streamPromptWithAgy(
     }
   }
 
-  // 5. Si hubo un error no recuperable, emitirlo
+  // 6. Si hubo un error no recuperable, emitirlo
   if (lastAgyError && accumulatedText.trim().length === 0) {
     yield {
       type: 'error',
@@ -354,7 +466,7 @@ export async function* streamPromptWithAgy(
     return;
   }
 
-  // 6. Finalización ordinaria
+  // 7. Finalización ordinaria
   yield {
     type: 'done',
     text: accumulatedText,

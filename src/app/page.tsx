@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Sidebar } from '@/chat/components/sidebar';
 import { ChatCanvas } from '@/chat/components/chat-canvas';
 import { SettingsModal } from '@/configuracion/components/settings-modal';
@@ -25,6 +25,30 @@ export default function MuacApp() {
   const [activeProjectPath, setActiveProjectPath] = useState<string>('');
   const [authToast, setAuthToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [isSyncingConversations, setIsSyncingConversations] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Referencia para cancelar la transmisión activa en curso
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Cargar estado de visualización del historial
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('muac_sidebar_open');
+      if (saved !== null) {
+        setIsSidebarOpen(saved === 'true');
+      }
+    }
+  }, []);
+
+  const handleToggleSidebar = () => {
+    setIsSidebarOpen((prev) => {
+      const next = !prev;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('muac_sidebar_open', String(next));
+      }
+      return next;
+    });
+  };
 
   // Estados de streaming y modales
   const [isStreaming, setIsStreaming] = useState(false);
@@ -539,6 +563,19 @@ export default function MuacApp() {
     }
   };
 
+  // Cancelar la transmisión de respuesta activa
+  const handleStopStreaming = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+    setStreamingDelta('');
+    if (activeConversationId) {
+      loadMessages(activeConversationId);
+    }
+  }, [activeConversationId, loadMessages]);
+
   // Envío de mensaje con streaming y soporte de archivos adjuntos
   const handleSendMessage = async (text: string, attachments?: Attachment[]) => {
     let targetConvoId = activeConversationId;
@@ -592,10 +629,14 @@ export default function MuacApp() {
     setRotationNotice(null);
     setVerificationAlert(null);
 
+    abortControllerRef.current = new AbortController();
+    const abortSignal = abortControllerRef.current.signal;
+
     try {
       const response = await fetch('/api/chat/stream', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: abortSignal,
         body: JSON.stringify({
           conversationId: targetConvoId,
           prompt: text,
@@ -676,9 +717,14 @@ export default function MuacApp() {
       await loadConversations();
       await handleRefreshQuotas();
     } catch (err) {
-      console.error('Error al enviar mensaje:', err);
-      alert((err as Error).message || 'Error en la transmisión');
+      if ((err as Error).name === 'AbortError') {
+        console.log('Transmisión detenida por el usuario');
+      } else {
+        console.error('Error al enviar mensaje:', err);
+        alert((err as Error).message || 'Error en la transmisión');
+      }
     } finally {
+      abortControllerRef.current = null;
       setIsStreaming(false);
       setStreamingDelta('');
     }
@@ -725,6 +771,8 @@ export default function MuacApp() {
         activeAccountEmail={activeAccount?.email}
         onSyncAntigravity={handleSyncAntigravity}
         isSyncing={isSyncingConversations}
+        isOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
       />
 
       {/* Canvas Principal de Conversación */}
@@ -739,6 +787,7 @@ export default function MuacApp() {
         activeAccountId={activeAccountId}
         onSelectAccount={handleSelectAccount}
         onSendMessage={handleSendMessage}
+        onStopStreaming={handleStopStreaming}
         isStreaming={isStreaming}
         streamingDelta={streamingDelta}
         rotationNotice={rotationNotice}
@@ -753,6 +802,8 @@ export default function MuacApp() {
         onDismissVerificationAlert={() => setVerificationAlert(null)}
         onRefreshQuotas={handleRefreshQuotas}
         activeConversationTitle={conversations.find((c) => c.id === activeConversationId)?.title}
+        isSidebarOpen={isSidebarOpen}
+        onToggleSidebar={handleToggleSidebar}
       />
 
       {/* Modal de Configuración Global */}

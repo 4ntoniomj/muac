@@ -100,6 +100,7 @@ export async function POST(req: Request) {
             {
               projectPath: effectiveProjectPath,
               reasoningEffort: effectiveReasoningEffort,
+              signal: req.signal,
             }
           )) {
             if (event.type === 'delta' && event.text) {

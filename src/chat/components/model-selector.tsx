@@ -78,7 +78,7 @@ export function ModelSelector({ selectedModelId, onSelectModel }: ModelSelectorP
                       {Math.round(model.contextLimit / 1000)}k ctx
                     </span>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800/70 text-slate-400 capitalize">
-                      {model.group === 'gemini' ? 'Google' : 'Third Party'}
+                      {model.group === 'gemini' ? 'Google' : 'Terceros'}
                     </span>
                   </div>
                 </div>

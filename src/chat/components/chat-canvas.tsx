@@ -29,6 +29,9 @@ import {
   Download,
   X,
   FileCode,
+  Square,
+  PanelLeft,
+  PanelLeftClose,
 } from 'lucide-react';
 
 interface ChatCanvasProps {
@@ -42,6 +45,7 @@ interface ChatCanvasProps {
   activeAccountId: string;
   onSelectAccount: (accountId: string) => void;
   onSendMessage: (text: string, attachments?: Attachment[]) => Promise<void>;
+  onStopStreaming?: () => void;
   isStreaming: boolean;
   streamingDelta: string;
   rotationNotice: { fromEmail: string; toEmail: string; reason: string } | null;
@@ -53,6 +57,8 @@ interface ChatCanvasProps {
   onDismissVerificationAlert?: () => void;
   onRefreshQuotas?: () => Promise<void> | void;
   activeConversationTitle?: string;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
 export function ChatCanvas({
@@ -66,6 +72,7 @@ export function ChatCanvas({
   activeAccountId,
   onSelectAccount,
   onSendMessage,
+  onStopStreaming,
   isStreaming,
   streamingDelta,
   rotationNotice,
@@ -77,6 +84,8 @@ export function ChatCanvas({
   onDismissVerificationAlert,
   onRefreshQuotas,
   activeConversationTitle,
+  isSidebarOpen = true,
+  onToggleSidebar,
 }: ChatCanvasProps) {
   const [inputText, setInputText] = useState('');
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
@@ -269,6 +278,41 @@ export function ChatCanvas({
         }
       }}
     >
+      {/* Barra Superior del Chat con Título y Botón para Mostrar/Ocultar Historial */}
+      <header className="h-12 border-b border-surface-border/70 px-4 flex items-center justify-between bg-surface/40 backdrop-blur-md shrink-0 select-none z-10">
+        <div className="flex items-center gap-2.5 min-w-0">
+          {onToggleSidebar && (
+            <button
+              type="button"
+              onClick={onToggleSidebar}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-surface-elevated transition-all border border-transparent hover:border-surface-border"
+              title={isSidebarOpen ? 'Ocultar historial de conversaciones' : 'Mostrar historial de conversaciones'}
+            >
+              {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4 text-blue-400" />}
+            </button>
+          )}
+
+          <div className="flex items-center gap-2 truncate">
+            <h2 className="text-xs font-semibold text-slate-200 truncate">
+              {activeConversationTitle || 'Nueva conversación'}
+            </h2>
+            {projectPath && (
+              <span
+                className="text-[10px] px-2 py-0.5 rounded-md bg-surface-elevated border border-surface-border text-amber-300 font-mono truncate max-w-[220px]"
+                title={projectPath}
+              >
+                📁 {projectPath.split('/').filter(Boolean).pop() || projectPath}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 text-slate-400">
+          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-elevated/70 border border-surface-border">
+            {messages.length} {messages.length === 1 ? 'mensaje' : 'mensajes'}
+          </span>
+        </div>
+      </header>
       {/* Indicador visual de Drag and Drop */}
       {isDragging && (
         <div className="absolute inset-0 z-40 bg-blue-950/70 border-2 border-dashed border-blue-400 backdrop-blur-sm flex flex-col items-center justify-center text-blue-200">
@@ -470,8 +514,8 @@ export function ChatCanvas({
                       {msg.usage.totalTokens > 0 && (
                         <span>
                           {msg.usage.totalTokens.toLocaleString()} tokens (
-                          {msg.usage.inputTokens.toLocaleString()} in /{' '}
-                          {msg.usage.outputTokens.toLocaleString()} out)
+                          {msg.usage.inputTokens.toLocaleString()} entrada /{' '}
+                          {msg.usage.outputTokens.toLocaleString()} salida)
                         </span>
                       )}
                       {msg.accountEmail && (
@@ -627,23 +671,34 @@ export function ChatCanvas({
                 className="flex-1 bg-transparent text-slate-200 text-xs px-1 py-1.5 focus:outline-none resize-none max-h-44 placeholder:text-slate-500 leading-relaxed font-sans"
               />
 
-              <button
-                type="button"
-                onClick={handleSubmit}
-                disabled={(!inputText.trim() && pendingAttachments.length === 0) || isStreaming || isUploading}
-                className={`p-2 rounded-xl text-white font-semibold transition-all shrink-0 ${
-                  (inputText.trim() || pendingAttachments.length > 0) && !isStreaming && !isUploading
-                    ? 'bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/30'
-                    : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
-                }`}
-                title="Enviar mensaje"
-              >
-                {isStreaming || isUploading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  <Send className="w-4 h-4" />
-                )}
-              </button>
+              {isStreaming ? (
+                <button
+                  type="button"
+                  onClick={onStopStreaming}
+                  className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold transition-all shrink-0 shadow-md shadow-rose-600/30 flex items-center justify-center cursor-pointer animate-pulse"
+                  title="Detener respuesta"
+                >
+                  <Square className="w-4 h-4 fill-current" />
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleSubmit}
+                  disabled={(!inputText.trim() && pendingAttachments.length === 0) || isUploading}
+                  className={`p-2 rounded-xl text-white font-semibold transition-all shrink-0 ${
+                    (inputText.trim() || pendingAttachments.length > 0) && !isUploading
+                      ? 'bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/30'
+                      : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                  }`}
+                  title="Enviar mensaje"
+                >
+                  {isUploading ? (
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>

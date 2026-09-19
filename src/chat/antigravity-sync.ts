@@ -3,6 +3,7 @@ import path from 'node:path';
 import os from 'node:os';
 import { DatabaseSync } from 'node:sqlite';
 import { getDatabase } from '@/shared/db';
+import { ensureTrajectoryInCli } from '@/chat/agy-bridge';
 
 export interface SyncResult {
   totalScanned: number;
@@ -158,6 +159,7 @@ export async function syncAntigravityConversations(): Promise<SyncResult> {
 
       result.totalScanned++;
       processedConvoIds.add(convoId);
+      ensureTrajectoryInCli(convoId);
 
       try {
         const fileContent = fs.readFileSync(/*turbopackIgnore: true*/ transcriptPath, 'utf-8');

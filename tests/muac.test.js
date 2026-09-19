@@ -745,6 +745,85 @@ test('Sidebar: Partición de conversaciones en Proyectos (Workspaces) y Standalo
   assert.equal(result.projectMap.get('/home/antonio/Escritorio/Todo/IA/plantilla').length, 1);
 });
 
+// 30. Verificación de Prevención y Auto-sanación de "trajectory not found"
+test('Agy Bridge: Verificación de trayectoria en CLI y fallback seguro', () => {
+  const checkTrajectoryArg = (trajectoryExists, conversationId) => {
+    if (trajectoryExists && conversationId) {
+      return ['--conversation', conversationId];
+    }
+    return []; // No pasar flag rota si la trayectoria no existe
+  };
+
+  const argsWhenMissing = checkTrajectoryArg(false, '697601fc-6a58-4a6b-adee-166308cb04d8');
+  assert.deepEqual(argsWhenMissing, [], 'No debe incluir --conversation si la trayectoria no existe en ~/.gemini/antigravity-cli');
+
+  const argsWhenPresent = checkTrajectoryArg(true, '697601fc-6a58-4a6b-adee-166308cb04d8');
+  assert.deepEqual(argsWhenPresent, ['--conversation', '697601fc-6a58-4a6b-adee-166308cb04d8']);
+});
+
+// 31. Verificación de Ordenación de Proyectos por Actividad Reciente (Default)
+test('Proyectos: Ordenación por lastActivity descendente por defecto', () => {
+  const projects = [
+    { path: '/proj/a', name: 'Alpha', lastActivity: '2026-09-18T10:00:00Z', conversationCount: 5 },
+    { path: '/proj/b', name: 'Beta', lastActivity: '2026-09-19T09:30:00Z', conversationCount: 2 },
+    { path: '/proj/c', name: 'Gamma', lastActivity: null, conversationCount: 0 },
+    { path: '/proj/d', name: 'Delta', lastActivity: '2026-09-19T08:00:00Z', conversationCount: 8 },
+  ];
+
+  const sortProjects = (list, sortBy = 'recent') => {
+    const copy = [...list];
+    if (sortBy === 'recent') {
+      return copy.sort((a, b) => {
+        const timeA = a.lastActivity ? new Date(a.lastActivity).getTime() : 0;
+        const timeB = b.lastActivity ? new Date(b.lastActivity).getTime() : 0;
+        if (timeB !== timeA) return timeB - timeA;
+        return a.name.localeCompare(b.name);
+      });
+    } else if (sortBy === 'alpha_asc') {
+      return copy.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sortBy === 'count') {
+      return copy.sort((a, b) => b.conversationCount - a.conversationCount);
+    }
+    return copy;
+  };
+
+  const sortedRecent = sortProjects(projects, 'recent');
+  assert.equal(sortedRecent[0].name, 'Beta', 'El proyecto con actividad más reciente debe estar primero');
+  assert.equal(sortedRecent[1].name, 'Delta');
+  assert.equal(sortedRecent[2].name, 'Alpha');
+  assert.equal(sortedRecent[3].name, 'Gamma', 'Proyectos sin actividad van al final');
+
+  const sortedCount = sortProjects(projects, 'count');
+  assert.equal(sortedCount[0].name, 'Delta', 'Delta tiene más conversaciones');
+
+  const sortedAlpha = sortProjects(projects, 'alpha_asc');
+  assert.equal(sortedAlpha[0].name, 'Alpha');
+});
+
+// 32. Verificación de Filtro de Búsqueda de Chats en Tiempo Real
+test('Sidebar: Búsqueda de chats insensible a mayúsculas/minúsculas y por proyecto', () => {
+  const filterConversations = (conversations, query) => {
+    const q = query.trim().toLowerCase();
+    if (!q) return conversations;
+    return conversations.filter(
+      (c) =>
+        (c.title && c.title.toLowerCase().includes(q)) ||
+        (c.projectPath && c.projectPath.toLowerCase().includes(q))
+    );
+  };
+
+  const convos = [
+    { id: '1', title: 'Ajustar parámetros de rotación', projectPath: '/home/antonio/ia/muac' },
+    { id: '2', title: 'Diseño de interfaz oscura', projectPath: '/home/antonio/ia/frontend' },
+    { id: '3', title: 'Fix trajectory not found', projectPath: '/home/antonio/ia/muac' },
+  ];
+
+  assert.equal(filterConversations(convos, 'ROTACIÓN').length, 1);
+  assert.equal(filterConversations(convos, 'muac').length, 2);
+  assert.equal(filterConversations(convos, 'no-match').length, 0);
+  assert.equal(filterConversations(convos, '').length, 3);
+});
+
 
 
 

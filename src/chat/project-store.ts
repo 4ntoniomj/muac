@@ -7,6 +7,7 @@ export interface Project {
   path: string;
   createdAt: string;
   conversationsCount?: number;
+  lastActivity?: string | null;
 }
 
 // Proyectos estándar conocidos de Antigravity
@@ -18,7 +19,9 @@ const DEFAULT_KNOWN_PROJECTS: Array<{ name: string; path: string }> = [
   { name: 'ria', path: '/home/antonio/Escritorio/Todo/IA/ria' },
 ];
 
-export function listProjects(): Project[] {
+export type ProjectSortOrder = 'recent' | 'name-asc' | 'name-desc' | 'convos-count';
+
+export function listProjects(sortBy: ProjectSortOrder = 'recent'): Project[] {
   const db = getDatabase();
 
   // Asegurar que los proyectos conocidos estén registrados en la tabla
@@ -57,18 +60,28 @@ export function listProjects(): Project[] {
     // Ignorar
   }
 
+  let orderClause = 'ORDER BY last_activity DESC NULLS LAST, p.created_at DESC, p.name ASC';
+  if (sortBy === 'name-asc') {
+    orderClause = 'ORDER BY p.name ASC';
+  } else if (sortBy === 'name-desc') {
+    orderClause = 'ORDER BY p.name DESC';
+  } else if (sortBy === 'convos-count') {
+    orderClause = 'ORDER BY convos_count DESC, last_activity DESC NULLS LAST, p.name ASC';
+  }
+
   const rows = db.prepare(`
-    SELECT p.*, COUNT(c.id) as convos_count
+    SELECT p.*, COUNT(c.id) as convos_count, MAX(c.updated_at) as last_activity
     FROM projects p
     LEFT JOIN conversations c ON (c.project_path = p.path OR (p.path = 'default-cli-project' AND c.project_path = '/home/antonio'))
     GROUP BY p.id
-    ORDER BY p.name ASC
+    ${orderClause}
   `).all() as unknown as Array<{
     id: string;
     name: string;
     path: string;
     created_at: string;
     convos_count: number;
+    last_activity?: string;
   }>;
 
   return rows.map((r) => ({
@@ -77,6 +90,7 @@ export function listProjects(): Project[] {
     path: r.path,
     createdAt: r.created_at,
     conversationsCount: r.convos_count,
+    lastActivity: r.last_activity || null,
   }));
 }
 
