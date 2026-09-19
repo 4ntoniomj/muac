@@ -922,3 +922,31 @@ test('Micrófono: Fallback transparente a MediaRecorder cuando SpeechRecognition
   );
 });
 
+// 37. Verificación de Detección de Scroll y Botón Volver Abajo
+test('Scroll: Detección de distancia al final y visualización del botón Volver Abajo', () => {
+  const shouldShowScrollBottom = (scrollHeight, scrollTop, clientHeight, threshold = 140) => {
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    return distanceFromBottom > threshold;
+  };
+
+  // Usuario en el fondo (distancia = 0)
+  assert.equal(
+    shouldShowScrollBottom(2000, 1400, 600),
+    false,
+    'No debe mostrar el botón si el usuario ya está al fondo'
+  );
+
+  // Usuario cerca del fondo (distancia = 80px <= 140px)
+  assert.equal(
+    shouldShowScrollBottom(2000, 1320, 600),
+    false,
+    'No debe mostrar el botón si la distancia es menor o igual al umbral de 140px'
+  );
+
+  // Usuario ha subido deliberadamente por el chat (distancia = 500px > 140px)
+  assert.equal(
+    shouldShowScrollBottom(2000, 900, 600),
+    true,
+    'Debe mostrar el botón cuando el usuario sube más de 140px del final'
+  );
+});

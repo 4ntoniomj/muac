@@ -40,6 +40,7 @@ import {
   Check,
   Volume2,
   Play,
+  ArrowDown,
 } from 'lucide-react';
 
 interface ChatCanvasProps {
@@ -104,8 +105,11 @@ export function ChatCanvas({
   const [previewFileContent, setPreviewFileContent] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(false);
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUpRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -330,9 +334,28 @@ export function ChatCanvas({
     activeModelId
   );
 
-  // Auto-scroll al final
-  useEffect(() => {
+  // Detección de scroll del usuario para mostrar el botón "Volver abajo"
+  const handleScroll = () => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+    const isScrolledUp = distanceFromBottom > 140;
+    setShowScrollBottom(isScrolledUp);
+    isUserScrolledUpRef.current = isScrolledUp;
+  };
+
+  // Función para volver abajo del todo
+  const scrollToBottom = () => {
+    isUserScrolledUpRef.current = false;
+    setShowScrollBottom(false);
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Auto-scroll al final respetando si el usuario subió deliberadamente a leer mensajes anteriores
+  useEffect(() => {
+    if (!isUserScrolledUpRef.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, streamingDelta]);
 
   // Ajuste automático de altura del textarea
@@ -479,6 +502,8 @@ export function ChatCanvas({
 
     setInputText('');
     setPendingAttachments([]);
+    isUserScrolledUpRef.current = false;
+    setShowScrollBottom(false);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
     }
@@ -610,7 +635,12 @@ export function ChatCanvas({
       )}
 
       {/* Área de Mensajes */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6 max-w-4xl w-full mx-auto">
+      <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
+        <div
+          ref={messagesContainerRef}
+          onScroll={handleScroll}
+          className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6 max-w-4xl w-full mx-auto scroll-smooth"
+        >
         {messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 select-none">
             <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-xl shadow-blue-500/20 text-white mb-4">
@@ -838,6 +868,30 @@ export function ChatCanvas({
         )}
 
         <div ref={messagesEndRef} />
+        </div>
+
+        {/* Botón flotante para volver abajo del todo cuando subes por el chat */}
+        {showScrollBottom && (
+          <div className="absolute bottom-4 right-6 sm:right-8 z-20 animate-in fade-in zoom-in-95 duration-200">
+            <button
+              type="button"
+              onClick={scrollToBottom}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface-elevated/95 hover:bg-slate-700 text-slate-200 hover:text-white border border-surface-border shadow-xl hover:shadow-2xl transition-all text-xs font-medium backdrop-blur-md group hover:border-blue-500/50 cursor-pointer"
+              title="Volver abajo del todo"
+            >
+              <div className="w-5 h-5 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500 group-hover:text-white transition-colors shrink-0">
+                <ArrowDown className="w-3.5 h-3.5 group-hover:translate-y-0.5 transition-transform" />
+              </div>
+              <span>Volver abajo</span>
+              {isStreaming && (
+                <span className="flex h-2 w-2 relative ml-0.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                </span>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Barra Inferior de Entrada (Input Bar) */}
