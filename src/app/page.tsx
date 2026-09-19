@@ -697,7 +697,9 @@ export default function MuacApp() {
               setRotationNotice(event.rotationInfo);
               await loadAccounts();
             } else if (event.type === 'done') {
-              // Completado
+              // Apagar streaming de inmediato para evitar mezcla o duplicación visual
+              setIsStreaming(false);
+              setStreamingDelta('');
             } else if (event.type === 'error') {
               console.error('Error devuelto por stream:', event.error);
               if (event.verificationUrl || (event.error && (event.error.includes('eligible') || event.error.includes('verify')))) {
@@ -714,6 +716,10 @@ export default function MuacApp() {
           }
         }
       }
+
+      // Transmisión finalizada: apagar streaming de inmediato antes de las llamadas asíncronas de recarga
+      setIsStreaming(false);
+      setStreamingDelta('');
 
       // Recargar mensajes persistidos y cuotas actualizadas
       await loadMessages(targetConvoId);

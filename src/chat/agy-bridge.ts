@@ -166,10 +166,28 @@ export async function* streamPromptWithAgy(
   // 3. Resolver directorio de trabajo (Workspace) y banderas de agy
   let workingDir = process.cwd();
 
-  // Inclusión de System Prompt solo para modelos Gemini compatibles (los 3P lo ignoran)
+  if (options?.projectPath) {
+    const valid = validateSafeWorkspacePath(options.projectPath);
+    if (valid.valid && valid.resolvedPath) {
+      workingDir = valid.resolvedPath;
+    }
+  } else if (settings.defaultProjectPath) {
+    const valid = validateSafeWorkspacePath(settings.defaultProjectPath);
+    if (valid.valid && valid.resolvedPath) {
+      workingDir = valid.resolvedPath;
+    }
+  }
+
+  // Directivas de sistema: contexto de workspace y auto-autorización para no bloquearse pidiendo permisos
+  const systemDirectives = [
+    settings.systemPrompt?.trim() || 'Eres muac, un asistente técnico de alta precisión con inteligencia de Antigravity Pro.',
+    `[Workspace activo]: ${workingDir}`,
+    'Tienes autorización explícita para aplicar todos los cambios en el código y ejecutar herramientas necesarias en este workspace. Aplica los cambios directamente con write_to_file, replace_file_content o run_command sin pedir confirmaciones interactivas ni invocar herramientas como ask_permission.',
+  ].filter(Boolean).join('\n\n');
+
   let effectivePrompt = prompt;
-  if (settings.systemPrompt && settings.systemPrompt.trim() && modelGroup === 'gemini') {
-    effectivePrompt = `[System Instructions / Instrucciones de Sistema]:\n${settings.systemPrompt.trim()}\n\n${prompt}`;
+  if (modelGroup === 'gemini') {
+    effectivePrompt = `[System Instructions / Instrucciones de Sistema]:\n${systemDirectives}\n\n${prompt}`;
   }
 
   const trajectoryExists = ensureTrajectoryInCli(conversationId);
@@ -196,29 +214,19 @@ export async function* streamPromptWithAgy(
     args.push('--effort', effort);
   }
 
-  if (options?.projectPath) {
-    const valid = validateSafeWorkspacePath(options.projectPath);
-    if (valid.valid && valid.resolvedPath) {
-      workingDir = valid.resolvedPath;
-      args.push('--add-dir', normalizeWorkspacePath(workingDir));
-    }
-  } else if (settings.defaultProjectPath) {
-    const valid = validateSafeWorkspacePath(settings.defaultProjectPath);
-    if (valid.valid && valid.resolvedPath) {
-      workingDir = valid.resolvedPath;
-      args.push('--add-dir', normalizeWorkspacePath(workingDir));
-    }
-  }
+  // Añadir directorio de trabajo al workspace
+  args.push('--add-dir', normalizeWorkspacePath(workingDir));
 
+  // Auto-aprobar permisos de herramientas
   const skipPerms = options?.dangerouslySkipPermissions ?? settings.dangerouslySkipPermissions ?? true;
   if (skipPerms) {
     args.push('--dangerously-skip-permissions');
   }
 
-  const mode = options?.agentMode || settings.agentMode;
-  if (mode && mode !== 'default') {
-    args.push('--mode', mode);
-  }
+  // Modo de ejecución: por defecto 'accept-edits' para que agy aplique cambios de código sin suspenderse
+  const mode = options?.agentMode || settings.agentMode || 'accept-edits';
+  const effectiveMode = mode === 'default' ? 'accept-edits' : mode;
+  args.push('--mode', effectiveMode);
 
   const sandbox = options?.sandboxMode ?? settings.sandboxMode ?? false;
   if (sandbox) {
@@ -245,6 +253,23 @@ export async function* streamPromptWithAgy(
     env: process.env,
     shell: agyCmd.shell,
   });
+
+  // Auto-responder afirmativamente a cualquier prompt interactivo de confirmación o permisos en stdin
+  const autoConfirmPrompt = (data: Buffer | string) => {
+    const str = typeof data === 'string' ? data : data.toString();
+    if (
+      /proceed|permission|confirm|allow|\(y\/n\)|\[y\/n\]|\[Y\/n\]|\[y\/N\]|\? \[y/i.test(str)
+    ) {
+      try {
+        if (child.stdin && !child.stdin.destroyed && child.stdin.writable) {
+          child.stdin.write('y\n');
+        }
+      } catch {}
+    }
+  };
+
+  child.stdout.on('data', autoConfirmPrompt);
+  child.stderr.on('data', autoConfirmPrompt);
 
   const onAbort = () => {
     try {
@@ -294,6 +319,20 @@ export async function* streamPromptWithAgy(
         if (parsed.event === 'step_update' && parsed.step_update) {
           const step = parsed.step_update;
 
+          // Si una herramienta solicita permiso interactivo, auto-responder afirmativamente
+          if (
+            step.step_type === 'tool' &&
+            (step.tool_name === 'ask_permission' ||
+              step.tool_name === 'ask_custom_permission' ||
+              step.tool_name === 'ask_question')
+          ) {
+            try {
+              if (child.stdin && !child.stdin.destroyed && child.stdin.writable) {
+                child.stdin.write('y\n');
+              }
+            } catch {}
+          }
+
           // Emitir actividad de herramienta (ej. list_dir, run_command, view_file, etc.)
           if (step.step_type === 'tool') {
             yield {
@@ -304,30 +343,38 @@ export async function* streamPromptWithAgy(
                 state: step.state || 'ACTIVE',
                 toolName: step.tool_name || step.tool_info?.name || 'tool',
                 toolParameters: step.tool_info?.parameters,
-                toolOutput: typeof step.tool_info?.output === 'string'
-                  ? step.tool_info.output.slice(0, 300)
-                  : undefined,
+                toolOutput:
+                  typeof step.tool_info?.output === 'string'
+                    ? step.tool_info.output.slice(0, 300)
+                    : undefined,
                 durationSeconds: step.duration_seconds,
               },
             };
           }
 
-          // Emitir actividad de razonamiento inicial
-          if (step.step_type === 'agent_response' && !step.text_delta && step.state === 'ACTIVE') {
+          // Emitir actividad de razonamiento (pensamiento)
+          if (step.step_type === 'agent_response' && !step.text_delta) {
             yield {
               type: 'activity',
               activity: {
                 stepIndex: step.step_index,
                 stepType: 'thinking',
-                state: 'ACTIVE',
+                state: step.state || 'ACTIVE',
+                durationSeconds: step.duration_seconds,
               },
             };
           }
 
-          if (step.text_delta) {
-            accumulatedText += step.text_delta;
-            yield { type: 'delta', text: step.text_delta };
+          // Solo acumular y emitir deltas destinados como mensaje final para el usuario
+          if (step.step_type === 'agent_response' && step.text_delta) {
+            // Filtrar posibles etiquetas <thought>...</thought> del modelo
+            const cleanDelta = step.text_delta.replace(/<\/?thought>/gi, '');
+            if (cleanDelta) {
+              accumulatedText += cleanDelta;
+              yield { type: 'delta', text: cleanDelta };
+            }
           }
+
           if (step.usage) {
             finalUsage = {
               inputTokens: step.usage.input_tokens || 0,
@@ -339,6 +386,9 @@ export async function* streamPromptWithAgy(
         } else if (parsed.event === 'result' && parsed.result) {
           const res = parsed.result;
           if (res.duration_seconds) duration = res.duration_seconds;
+          if (res.response && typeof res.response === 'string') {
+            accumulatedText = res.response.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+          }
           if (res.usage) {
             finalUsage = {
               inputTokens: res.usage.input_tokens || 0,

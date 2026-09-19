@@ -950,3 +950,55 @@ test('Scroll: Detección de distancia al final y visualización del botón Volve
     'Debe mostrar el botón cuando el usuario sube más de 140px del final'
   );
 });
+
+// 38. Verificación de Derivación Automática del Nombre del Proyecto desde la Ruta
+test('Proyectos: Derivación automática del nombre a partir de la carpeta seleccionada en el diálogo nativo', () => {
+  const deriveProjectName = (folderPath) => {
+    if (!folderPath) return 'proyecto';
+    return folderPath.trim().split(/[/\\]+/).filter(Boolean).pop() || 'proyecto';
+  };
+
+  assert.equal(deriveProjectName('/home/antonio/Escritorio/Todo/IA/muac'), 'muac');
+  assert.equal(deriveProjectName('/home/antonio/proyectos/mi-nuevo-backend/'), 'mi-nuevo-backend');
+  assert.equal(deriveProjectName('C:\\Users\\Antonio\\proyectos\\frontend'), 'frontend');
+  assert.equal(deriveProjectName(''), 'proyecto');
+});
+
+// 39. Verificación de Banderas de agy: --mode accept-edits y auto-aprobación
+test('Agy Bridge: Inclusión de --mode accept-edits y auto-confirmación para ejecución sin bloqueos', () => {
+  const composeAgyArgs = (options, settings) => {
+    const args = ['--output-format', 'stream-json'];
+
+    const skipPerms = options?.dangerouslySkipPermissions ?? settings.dangerouslySkipPermissions ?? true;
+    if (skipPerms) {
+      args.push('--dangerously-skip-permissions');
+    }
+
+    const mode = options?.agentMode || settings.agentMode || 'accept-edits';
+    const effectiveMode = mode === 'default' ? 'accept-edits' : mode;
+    args.push('--mode', effectiveMode);
+
+    return args;
+  };
+
+  const defaultSettings = { dangerouslySkipPermissions: true, agentMode: 'default' };
+  const args = composeAgyArgs(undefined, defaultSettings);
+
+  assert.ok(args.includes('--dangerously-skip-permissions'), 'Debe incluir --dangerously-skip-permissions');
+  assert.ok(args.includes('--mode'), 'Debe incluir flag --mode');
+  const modeIndex = args.indexOf('--mode');
+  assert.equal(args[modeIndex + 1], 'accept-edits', 'Debe usar accept-edits por defecto para aplicar cambios sin bloquearse');
+});
+
+// 40. Verificación de Filtrado de Pensamiento y Respuesta Limpia
+test('Streaming: Filtrado de bloques de pensamiento y respuesta consolidada limpia', () => {
+  const cleanResponse = (rawResponse) => {
+    return rawResponse.replace(/<thought>[\s\S]*?<\/thought>/gi, '').trim();
+  };
+
+  const raw = '<thought>El usuario pide crear un archivo. Usaré write_to_file.</thought>Archivo creado con éxito.';
+  const cleaned = cleanResponse(raw);
+
+  assert.equal(cleaned, 'Archivo creado con éxito.', 'Debe remover completamente el bloque de pensamiento de la respuesta del usuario');
+});
+

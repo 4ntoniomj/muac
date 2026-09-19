@@ -75,9 +75,7 @@ export function Sidebar({
 
   const [collapsedProjects, setCollapsedProjects] = useState<Set<string>>(new Set());
   const [registeredProjects, setRegisteredProjects] = useState<ProjectItem[]>([]);
-  const [isAddingProject, setIsAddingProject] = useState(false);
-  const [newProjectName, setNewProjectName] = useState('');
-  const [newProjectPath, setNewProjectPath] = useState('');
+  const [isBrowsingProject, setIsBrowsingProject] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [projectSortBy, setProjectSortBy] = useState<'recent' | 'name-asc' | 'name-desc' | 'convos-count'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
@@ -170,24 +168,37 @@ export function Sidebar({
     setIsSelectMode(false);
   };
 
-  const handleCreateNewProject = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newProjectName.trim() || !newProjectPath.trim()) return;
+  // Abrir selector nativo de carpetas y crear proyecto automáticamente con el nombre de la carpeta
+  const handleBrowseAndAddProject = async () => {
+    setIsBrowsingProject(true);
     try {
-      const res = await fetch('/api/projects', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newProjectName.trim(), path: newProjectPath.trim() }),
-      });
+      const res = await fetch('/api/workspace/browse', { method: 'POST' });
       const data = await res.json();
-      if (data.success && data.project) {
-        setRegisteredProjects((prev) => [...prev, data.project]);
-        setNewProjectName('');
-        setNewProjectPath('');
-        setIsAddingProject(false);
+      if (data.success && data.path) {
+        const selectedPath = data.path.trim();
+        const folderName = selectedPath.split(/[/\\]+/).filter(Boolean).pop() || 'proyecto';
+
+        const createRes = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: folderName, path: selectedPath }),
+        });
+        const createData = await createRes.json();
+        if (createData.success && createData.project) {
+          setRegisteredProjects((prev) => {
+            if (prev.some((p) => p.path === selectedPath)) return prev;
+            return [...prev, createData.project];
+          });
+        }
+
+        if (onNewConversation) {
+          onNewConversation(selectedPath);
+        }
       }
     } catch (err) {
-      console.error('Error al registrar proyecto:', err);
+      console.error('Error al abrir selector de carpetas para nuevo proyecto:', err);
+    } finally {
+      setIsBrowsingProject(false);
     }
   };
 
@@ -470,47 +481,7 @@ export function Sidebar({
         </div>
       )}
 
-      {/* Formulario emergente para añadir un nuevo proyecto */}
-      {isAddingProject && (
-        <form onSubmit={handleCreateNewProject} className="p-3 mx-2 my-1.5 rounded-xl bg-[#1a1d24] border border-[#2a303c] flex flex-col gap-2">
-          <div className="flex items-center justify-between text-[11px] font-semibold text-slate-300">
-            <span>Nuevo Proyecto Workspace</span>
-            <button type="button" onClick={() => setIsAddingProject(false)} className="text-slate-500 hover:text-white">
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          <input
-            type="text"
-            placeholder="Nombre (ej. nuevo-proyecto)"
-            value={newProjectName}
-            onChange={(e) => setNewProjectName(e.target.value)}
-            className="px-2 py-1 rounded bg-[#111317] border border-[#2a303c] text-slate-200 text-xs focus:outline-none focus:border-blue-500"
-            autoFocus
-          />
-          <input
-            type="text"
-            placeholder="Ruta absoluta (ej. /home/antonio/...)"
-            value={newProjectPath}
-            onChange={(e) => setNewProjectPath(e.target.value)}
-            className="px-2 py-1 rounded bg-[#111317] border border-[#2a303c] text-slate-200 text-xs focus:outline-none focus:border-blue-500"
-          />
-          <div className="flex justify-end gap-1.5 pt-1">
-            <button
-              type="button"
-              onClick={() => setIsAddingProject(false)}
-              className="px-2 py-1 rounded text-slate-400 hover:text-white text-[10px]"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-2.5 py-1 rounded bg-blue-600 hover:bg-blue-500 text-white font-medium text-[10px]"
-            >
-              Añadir
-            </button>
-          </div>
-        </form>
-      )}
+
 
       {/* Área Central con Scroll: Proyectos y Conversaciones */}
       <div className="flex-1 overflow-y-auto px-3 py-2 flex flex-col gap-4">
@@ -614,11 +585,16 @@ export function Sidebar({
               </button>
               <button
                 type="button"
-                onClick={() => setIsAddingProject(true)}
+                onClick={handleBrowseAndAddProject}
+                disabled={isBrowsingProject}
                 className="hover:text-slate-300 transition-colors p-1"
-                title="Añadir nuevo proyecto workspace"
+                title="Seleccionar carpeta para nuevo proyecto workspace"
               >
-                <FolderPlus className="w-3.5 h-3.5" />
+                {isBrowsingProject ? (
+                  <div className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                ) : (
+                  <FolderPlus className="w-3.5 h-3.5" />
+                )}
               </button>
             </div>
           </div>
