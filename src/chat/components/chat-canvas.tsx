@@ -32,6 +32,9 @@ import {
   Square,
   PanelLeft,
   PanelLeftClose,
+  Plus,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 
 interface ChatCanvasProps {
@@ -91,10 +94,105 @@ export function ChatCanvas({
   const [pendingAttachments, setPendingAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const recognitionRef = useRef<any>(null);
+  const isRecordingRef = useRef(false);
+  const baseTextRef = useRef('');
+
+  // Limpieza al desmontar para no dejar el micrófono abierto
+  useEffect(() => {
+    return () => {
+      isRecordingRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+    };
+  }, []);
+
+  // Manejo de grabación continua por micrófono (dictado sin límite)
+  const handleToggleRecording = () => {
+    if (isRecording) {
+      isRecordingRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      typeof window !== 'undefined' &&
+      ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+    if (!SpeechRecognition) {
+      alert('Tu navegador no soporta la API de reconocimiento de voz. Usa Chrome, Edge u otro navegador compatible.');
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'es-ES';
+
+      baseTextRef.current = inputText;
+      isRecordingRef.current = true;
+      setIsRecording(true);
+
+      recognition.onresult = (event: any) => {
+        let transcript = '';
+        for (let i = 0; i < event.results.length; i++) {
+          transcript += event.results[i][0].transcript;
+        }
+        const base = baseTextRef.current.trim();
+        const separator = base ? ' ' : '';
+        const newText = base + separator + transcript.trim();
+        setInputText(newText);
+
+        if (textareaRef.current) {
+          textareaRef.current.style.height = 'auto';
+          textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 180)}px`;
+        }
+      };
+
+      recognition.onerror = (event: any) => {
+        console.warn('Speech recognition error:', event.error);
+        if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+          alert('Permiso de micrófono denegado. Permite el acceso al micrófono en el navegador.');
+          isRecordingRef.current = false;
+          setIsRecording(false);
+        }
+      };
+
+      recognition.onend = () => {
+        // Sin límite de grabación: reanudar automáticamente si el usuario no ha parado
+        if (isRecordingRef.current) {
+          try {
+            recognition.start();
+          } catch {
+            // Ya activo
+          }
+        } else {
+          setIsRecording(false);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.error('Error al iniciar reconocimiento de voz:', err);
+      isRecordingRef.current = false;
+      setIsRecording(false);
+    }
+  };
 
   const activeModel = findModel(activeModelId);
 
@@ -240,6 +338,16 @@ export function ChatCanvas({
       } finally {
         setIsUploading(false);
       }
+    }
+
+    if (isRecording) {
+      isRecordingRef.current = false;
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {}
+      }
+      setIsRecording(false);
     }
 
     setInputText('');
@@ -648,7 +756,7 @@ export function ChatCanvas({
             )}
 
             <div className="relative flex items-end gap-2">
-              {/* Botón de Adjuntar Fotos, Videos o Archivos */}
+              {/* Botón de Adjuntar Fotos, Videos o Archivos (+) */}
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
@@ -656,7 +764,11 @@ export function ChatCanvas({
                 className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-elevated transition-colors shrink-0"
                 title="Adjuntar fotos, videos o archivos (también puedes arrastrarlos o pegar capturas)"
               >
-                <Paperclip className={`w-4 h-4 ${isUploading ? 'animate-spin text-blue-400' : ''}`} />
+                {isUploading ? (
+                  <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                ) : (
+                  <Plus className="w-4 h-4" />
+                )}
               </button>
 
               <textarea
@@ -670,6 +782,36 @@ export function ChatCanvas({
                 placeholder="Envía un mensaje, foto, video o archivo... (textos de >35 líneas se pasan como archivo)"
                 className="flex-1 bg-transparent text-slate-200 text-xs px-1 py-1.5 focus:outline-none resize-none max-h-44 placeholder:text-slate-500 leading-relaxed font-sans"
               />
+
+              {/* Botón de Micrófono para Dictar Prompt (a la izquierda del botón de enviar) */}
+              <button
+                type="button"
+                onClick={handleToggleRecording}
+                disabled={isStreaming}
+                className={`p-2 rounded-xl transition-all shrink-0 flex items-center justify-center gap-1.5 ${
+                  isRecording
+                    ? 'bg-red-950/90 border border-red-500/60 text-red-300 shadow-lg shadow-red-950/60 hover:bg-red-900/90'
+                    : 'text-slate-400 hover:text-white hover:bg-surface-elevated'
+                }`}
+                title={
+                  isRecording
+                    ? 'Grabando voz sin límite... Haz clic para detener'
+                    : 'Dictar mensaje con el micrófono (sin límite de tiempo)'
+                }
+              >
+                {isRecording ? (
+                  <>
+                    {/* Circulito con un tono más oscuro para que quede claro que está grabando */}
+                    <span className="relative flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-600 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-950 border border-red-600 shadow-inner" />
+                    </span>
+                    <Mic className="w-4 h-4 text-red-400 animate-pulse" />
+                  </>
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
 
               {isStreaming ? (
                 <button

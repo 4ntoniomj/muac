@@ -373,6 +373,9 @@ export default function MuacApp() {
 
   // Manejo de anclado masivo de conversaciones
   const handleBulkPin = async (ids: string[], isPinned: boolean) => {
+    setConversations((prev) =>
+      prev.map((c) => (ids.includes(c.id) ? { ...c, isPinned } : c))
+    );
     try {
       await fetch('/api/conversations', {
         method: 'POST',

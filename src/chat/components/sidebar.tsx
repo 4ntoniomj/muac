@@ -21,7 +21,6 @@ import {
   FolderPlus,
   Search,
   ArrowUpDown,
-  PanelLeftClose,
 } from 'lucide-react';
 
 export interface ProjectItem {
@@ -238,14 +237,15 @@ export function Sidebar({
     }> = [];
     const seenPaths = new Set<string>();
 
-    // Primero los proyectos registrados oficialmente
+    // Primero los proyectos registrados oficialmente que tengan conversaciones
     for (const p of registeredProjects) {
       const norm = normalizePath(p.path);
       seenPaths.add(norm);
       const convos = projectMap.get(norm) || projectMap.get(p.path) || [];
-      const lastTime = convos.length > 0
-        ? Math.max(...convos.map((c) => new Date(c.updatedAt || c.createdAt).getTime()))
-        : (p.createdAt ? new Date(p.createdAt).getTime() : 0);
+      // Omitir si no tiene chats
+      if (convos.length === 0) continue;
+
+      const lastTime = Math.max(...convos.map((c) => new Date(c.updatedAt || c.createdAt).getTime()));
 
       list.push({
         id: p.id,
@@ -258,12 +258,10 @@ export function Sidebar({
 
     // Añadir cualquier otro proyecto que aparezca en las conversaciones pero no esté en registeredProjects
     projectMap.forEach((convos, pathKey) => {
-      if (!seenPaths.has(pathKey) && pathKey !== 'default-cli-project') {
+      if (!seenPaths.has(pathKey) && pathKey !== 'default-cli-project' && convos.length > 0) {
         const parts = pathKey.split('/').filter(Boolean);
         const name = parts[parts.length - 1] || pathKey;
-        const lastTime = convos.length > 0
-          ? Math.max(...convos.map((c) => new Date(c.updatedAt || c.createdAt).getTime()))
-          : 0;
+        const lastTime = Math.max(...convos.map((c) => new Date(c.updatedAt || c.createdAt).getTime()));
 
         list.push({
           id: 'proj_' + pathKey,
@@ -338,27 +336,16 @@ export function Sidebar({
           : 'w-64 opacity-100 translate-x-0'
       } transition-all duration-300 ease-in-out h-full bg-[#111317] border-r border-[#1e222b] flex flex-col select-none shrink-0 relative font-sans text-xs z-30`}
     >
-      {/* Cabecera Principal: + Nueva conversación y Botón de Ocultar Historial */}
-      <div className="p-3 pb-2 flex items-center gap-2">
+      {/* Cabecera Principal: + Nueva conversación */}
+      <div className="p-3 pb-2 flex items-center">
         <button
           type="button"
           onClick={() => onNewConversation()}
-          className="flex-1 flex items-center justify-start gap-2.5 py-2 px-3.5 rounded-xl bg-[#1a1d24] hover:bg-[#222731] border border-[#262c37] text-slate-200 hover:text-white text-xs font-medium shadow-sm transition-all active:scale-[0.99]"
+          className="w-full flex items-center justify-start gap-2.5 py-2 px-3.5 rounded-xl bg-[#1a1d24] hover:bg-[#222731] border border-[#262c37] text-slate-200 hover:text-white text-xs font-medium shadow-sm transition-all active:scale-[0.99]"
         >
           <Plus className="w-4 h-4 text-slate-400" />
           <span>Nueva conversación</span>
         </button>
-
-        {onToggleSidebar && (
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-[#1a1d24] border border-transparent hover:border-[#262c37] transition-all shrink-0"
-            title="Ocultar historial de conversaciones"
-          >
-            <PanelLeftClose className="w-4 h-4" />
-          </button>
-        )}
       </div>
 
       {/* Buscador de Chats en Tiempo Real */}
@@ -389,11 +376,30 @@ export function Sidebar({
       <div className="px-3 pb-2 flex flex-col gap-0.5 border-b border-[#1e222b]/80">
         <button
           type="button"
-          onClick={handleToggleSelectAll}
-          className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-[#1a1d24] transition-colors text-xs text-left"
+          onClick={() => {
+            if (isSelectMode) {
+              setSelectedIds(new Set());
+              setIsSelectMode(false);
+            } else {
+              setIsSelectMode(true);
+            }
+          }}
+          className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors text-xs text-left ${
+            isSelectMode
+              ? 'bg-blue-950/60 text-blue-300 border border-blue-500/30'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-[#1a1d24]'
+          }`}
+          title={isSelectMode ? 'Salir de selección múltiple' : 'Activar selección múltiple de chats'}
         >
-          <History className="w-3.5 h-3.5 text-slate-400" />
-          <span>Historial de conversaciones</span>
+          <div className="flex items-center gap-2.5">
+            <History className="w-3.5 h-3.5 text-slate-400" />
+            <span>Historial de conversaciones</span>
+          </div>
+          {isSelectMode ? (
+            <span className="text-[10px] font-semibold text-blue-400">Modo selección</span>
+          ) : (
+            <span className="text-[10px] text-slate-500 font-mono">{conversations.length}</span>
+          )}
         </button>
 
         <button
@@ -408,43 +414,56 @@ export function Sidebar({
 
       {/* Acciones en Lote cuando hay conversaciones seleccionadas */}
       {selectedIds.size > 0 && (
-        <div className="p-2 mx-2 my-1.5 rounded-xl bg-blue-950/80 border border-blue-500/40 shadow-xl flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-1 duration-150">
+        <div className="p-2.5 mx-2 my-1.5 rounded-xl bg-[#1a2333] border border-blue-500/40 shadow-xl flex flex-col gap-2 animate-in fade-in slide-in-from-top-1 duration-150 z-20">
           <div className="flex items-center justify-between text-[11px] text-blue-200 px-1">
-            <span className="font-semibold">{selectedIds.size} seleccionados</span>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedIds(new Set());
-                setIsSelectMode(false);
-              }}
-              className="text-slate-400 hover:text-white p-0.5"
-            >
-              <X className="w-3 h-3" />
-            </button>
+            <span className="font-semibold">{selectedIds.size} seleccionada(s)</span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleToggleSelectAll}
+                className="text-[10px] text-blue-400 hover:text-blue-300 underline cursor-pointer"
+              >
+                {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedIds(new Set());
+                  setIsSelectMode(false);
+                }}
+                className="text-slate-400 hover:text-white p-0.5"
+                title="Cerrar selección"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-1">
+          <div className="grid grid-cols-3 gap-1.5">
             <button
               type="button"
               onClick={() => handleBulkPin(true)}
-              className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/30 text-[10px] text-blue-200"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/40 text-[11px] text-blue-200 font-medium transition-all"
+              title="Anclar seleccionados"
             >
-              <Pin className="w-2.5 h-2.5" />
+              <Pin className="w-3 h-3" />
               <span>Anclar</span>
             </button>
             <button
               type="button"
               onClick={() => handleBulkPin(false)}
-              className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-slate-800 hover:bg-slate-700 text-[10px] text-slate-300"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 font-medium transition-all"
+              title="Desanclar seleccionados"
             >
               <span>Desanclar</span>
             </button>
             <button
               type="button"
               onClick={handleRequestBulkDelete}
-              className="flex items-center justify-center gap-1 py-1 px-1.5 rounded bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 text-[10px] text-red-300"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-red-600/25 hover:bg-red-600/45 border border-red-500/40 text-[11px] text-red-300 font-medium transition-all"
+              title="Eliminar seleccionados"
             >
-              <Trash2 className="w-2.5 h-2.5" />
+              <Trash2 className="w-3 h-3" />
               <span>Eliminar</span>
             </button>
           </div>
@@ -789,20 +808,21 @@ export function Sidebar({
         }}
       >
         <div className="flex items-center gap-2 min-w-0 pr-8 flex-1">
-          {/* Checkbox de selección si está en modo selección o seleccionado */}
-          {(isSelectMode || isSelected) && (
-            <button
-              type="button"
-              onClick={(e) => handleToggleSelectOne(convo.id, e)}
-              className="p-0.5 rounded text-slate-400 hover:text-white shrink-0"
-            >
-              {isSelected ? (
-                <CheckSquare className="w-3 h-3 text-blue-400" />
-              ) : (
-                <Square className="w-3 h-3 text-slate-500" />
-              )}
-            </button>
-          )}
+          {/* Checkbox de selección múltiple (visible en hover o si está seleccionado o en modo selección) */}
+          <button
+            type="button"
+            onClick={(e) => handleToggleSelectOne(convo.id, e)}
+            className={`p-0.5 rounded text-slate-400 hover:text-white transition-opacity shrink-0 ${
+              isSelectMode || isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
+            }`}
+            title={isSelected ? 'Deseleccionar conversación' : 'Seleccionar conversación'}
+          >
+            {isSelected ? (
+              <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+            ) : (
+              <Square className="w-3.5 h-3.5 text-slate-500 hover:text-slate-300" />
+            )}
+          </button>
 
           {convo.isPinned && (
             <Pin className="w-2.5 h-2.5 text-amber-400 fill-amber-400 rotate-45 shrink-0" />

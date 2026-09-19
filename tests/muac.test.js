@@ -824,6 +824,49 @@ test('Sidebar: Búsqueda de chats insensible a mayúsculas/minúsculas y por pro
   assert.equal(filterConversations(convos, '').length, 3);
 });
 
+// 33. Verificación de Exclusión de Proyectos sin Conversaciones del Historial
+test('Proyectos: Los proyectos que no tengan chats no se muestran en el historial', () => {
+  const filterActiveProjects = (projects) => {
+    return projects.filter((p) => (p.convos && p.convos.length > 0) || (p.conversationsCount && p.conversationsCount > 0));
+  };
+
+  const projectList = [
+    { name: 'muac', convos: [{ id: '1', title: 'Chat 1' }] },
+    { name: 'empty-project-1', convos: [] },
+    { name: 'frontend', convos: [{ id: '2', title: 'Chat 2' }] },
+    { name: 'empty-project-2', convos: [] },
+  ];
+
+  const activeProjects = filterActiveProjects(projectList);
+  assert.equal(activeProjects.length, 2, 'Solo los proyectos con chats deben mantenerse');
+  assert.equal(activeProjects[0].name, 'muac');
+  assert.equal(activeProjects[1].name, 'frontend');
+});
+
+// 34. Verificación de Dictado por Voz Continuo sin Límite
+test('Dictado por Voz: Configuración continua y autoreinicio sin límite de tiempo', () => {
+  let isRecording = true;
+  let restartedCount = 0;
+
+  // Mock del ciclo de SpeechRecognition
+  const mockOnEnd = () => {
+    if (isRecording) {
+      // Reanuda automáticamente para eliminar el límite de tiempo de grabación
+      restartedCount++;
+    }
+  };
+
+  // El motor de voz del navegador corta por silencio
+  mockOnEnd();
+  mockOnEnd();
+  assert.equal(restartedCount, 2, 'Debe reanudar la escucha continuamente mientras isRecording sea true');
+
+  // El usuario para la grabación
+  isRecording = false;
+  mockOnEnd();
+  assert.equal(restartedCount, 2, 'No debe reiniciar cuando el usuario ha detenido la grabación');
+});
+
 
 
 

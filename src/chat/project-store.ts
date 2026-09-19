@@ -24,19 +24,20 @@ export type ProjectSortOrder = 'recent' | 'name-asc' | 'name-desc' | 'convos-cou
 export function listProjects(sortBy: ProjectSortOrder = 'recent'): Project[] {
   const db = getDatabase();
 
-  // Asegurar que los proyectos conocidos estén registrados en la tabla
-  for (const kp of DEFAULT_KNOWN_PROJECTS) {
-    try {
-      db.prepare(`
-        INSERT OR IGNORE INTO projects (id, name, path, created_at)
-        VALUES (?, ?, ?, ?)
-      `).run('proj_' + crypto.randomUUID(), kp.name, kp.path, new Date().toISOString());
-    } catch {
-      // Ignorar si ya existe
-    }
+  // Eliminar de la base de datos los proyectos que no tengan chats
+  try {
+    db.prepare(`
+      DELETE FROM projects
+      WHERE id NOT IN (
+        SELECT DISTINCT p.id FROM projects p
+        JOIN conversations c ON (c.project_path = p.path OR (p.path = 'default-cli-project' AND c.project_path = '/home/antonio'))
+      )
+    `).run();
+  } catch {
+    // Ignorar si no es posible
   }
 
-  // Buscar también rutas de proyectos que aparezcan en conversaciones
+  // Buscar rutas de proyectos que aparezcan en conversaciones activas
   try {
     const convoPaths = db.prepare(`
       SELECT DISTINCT project_path FROM conversations 
@@ -72,8 +73,9 @@ export function listProjects(sortBy: ProjectSortOrder = 'recent'): Project[] {
   const rows = db.prepare(`
     SELECT p.*, COUNT(c.id) as convos_count, MAX(c.updated_at) as last_activity
     FROM projects p
-    LEFT JOIN conversations c ON (c.project_path = p.path OR (p.path = 'default-cli-project' AND c.project_path = '/home/antonio'))
+    JOIN conversations c ON (c.project_path = p.path OR (p.path = 'default-cli-project' AND c.project_path = '/home/antonio'))
     GROUP BY p.id
+    HAVING convos_count > 0
     ${orderClause}
   `).all() as unknown as Array<{
     id: string;
