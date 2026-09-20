@@ -773,11 +773,14 @@ export default function MuacApp() {
         onTogglePinConversation={handleTogglePinConversation}
         onBulkPin={handleBulkPin}
         onBulkDelete={handleBulkDelete}
-        onOpenSettings={() => {
-          setSettingsInitialTab('rotacion');
+        onOpenSettings={(tab = 'rotacion') => {
+          setSettingsInitialTab(tab);
           setIsSettingsOpen(true);
         }}
         activeAccountEmail={activeAccount?.email}
+        accounts={accounts}
+        activeAccountId={activeAccountId}
+        onSelectAccount={handleSelectAccount}
         onSyncAntigravity={handleSyncAntigravity}
         isSyncing={isSyncingConversations}
         isOpen={isSidebarOpen}

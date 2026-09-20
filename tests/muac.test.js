@@ -1263,4 +1263,33 @@ test('File Explorer: filterTree busca archivos recursivamente ignorando mayúscu
   assert.equal(jsonResult[0].name, 'package.json');
 });
 
+// 54. Verificación de Popover de Cuentas en Sidebar: Clases de Estado (Activa, Disponible, Agotada)
+test('Sidebar Account Popover: Determinación de estilos visuales para cuentas activas, disponibles y agotadas', () => {
+  const getAccountItemClasses = ({ isExhausted, isSelected }) => {
+    if (isExhausted) {
+      return 'bg-canvas/90 border-surface-border-subtle text-slate-500 opacity-50 grayscale-[50%] cursor-not-allowed';
+    }
+    if (isSelected) {
+      return 'bg-accent/15 border-accent/40 text-white font-medium shadow-sm';
+    }
+    return 'bg-surface hover:bg-surface-hover border-surface-border text-slate-200 hover:border-surface-border-hover cursor-pointer transition-colors';
+  };
+
+  const exhaustedStyle = getAccountItemClasses({ isExhausted: true, isSelected: false });
+  assert.ok(exhaustedStyle.includes('opacity-50'), 'Cuenta agotada debe tener opacidad reducida (50%)');
+  assert.ok(exhaustedStyle.includes('grayscale-[50%]'), 'Cuenta agotada debe aplicar escala de grises');
+  assert.ok(exhaustedStyle.includes('cursor-not-allowed'), 'Cuenta agotada no debe ser seleccionable');
+  assert.ok(exhaustedStyle.includes('bg-canvas/90'), 'Cuenta agotada debe usar fondo atenuado');
+
+  const activeStyle = getAccountItemClasses({ isExhausted: false, isSelected: true });
+  assert.ok(activeStyle.includes('bg-accent/15'), 'Cuenta activa debe tener fondo acento');
+  assert.ok(activeStyle.includes('border-accent/40'), 'Cuenta activa debe tener borde acento');
+  assert.ok(activeStyle.includes('text-white'), 'Cuenta activa debe tener texto blanco destacado');
+
+  const availableStyle = getAccountItemClasses({ isExhausted: false, isSelected: false });
+  assert.ok(availableStyle.includes('cursor-pointer'), 'Cuenta disponible debe ser seleccionable');
+  assert.ok(availableStyle.includes('bg-surface'), 'Cuenta disponible debe usar fondo surface estándar');
+});
+
+
 

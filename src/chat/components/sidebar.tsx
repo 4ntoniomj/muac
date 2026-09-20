@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Conversation } from '@/shared/types/chat';
 import type { AccountWithQuota } from '@/shared/types/account';
 import { formatRelativeTime } from '@/shared/time-utils';
-import { formatTimeUntilReset } from '@/shared/quota-utils';
+import { formatTimeUntilReset, isQuotaExhausted } from '@/shared/quota-utils';
 import {
   Plus,
   Trash2,
@@ -23,6 +23,9 @@ import {
   FolderPlus,
   Search,
   ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  Check,
 } from 'lucide-react';
 import { ScheduledTasksModal } from './scheduled-tasks-modal';
 
@@ -44,8 +47,11 @@ interface SidebarProps {
   onTogglePinConversation: (id: string, isPinned?: boolean) => Promise<void> | void;
   onBulkPin: (ids: string[], isPinned: boolean) => Promise<void> | void;
   onBulkDelete: (ids: string[]) => Promise<void> | void;
-  onOpenSettings: () => void;
+  onOpenSettings: (tab?: 'rotacion' | 'cuentas' | 'permisos') => void;
   activeAccountEmail?: string;
+  accounts?: AccountWithQuota[];
+  activeAccountId?: string;
+  onSelectAccount?: (accountId: string) => Promise<void> | void;
   onSyncAntigravity?: () => Promise<void> | void;
   isSyncing?: boolean;
   isOpen?: boolean;
@@ -64,6 +70,9 @@ export function Sidebar({
   onBulkDelete,
   onOpenSettings,
   activeAccountEmail,
+  accounts,
+  activeAccountId,
+  onSelectAccount,
   onSyncAntigravity,
   isSyncing = false,
   isOpen = true,
@@ -86,6 +95,30 @@ export function Sidebar({
   const [projectSortBy, setProjectSortBy] = useState<'recent' | 'name-asc' | 'name-desc' | 'convos-count'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [sidebarAccounts, setSidebarAccounts] = useState<AccountWithQuota[]>([]);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cerrar menú al hacer clic fuera o presionar Escape
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (accountMenuRef.current && !accountMenuRef.current.contains(event.target as Node)) {
+        setIsAccountMenuOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setIsAccountMenuOpen(false);
+      }
+    }
+    if (isAccountMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isAccountMenuOpen]);
 
   // Cargar proyectos registrados desde la API
   useEffect(() => {
@@ -103,8 +136,9 @@ export function Sidebar({
     fetchProjects();
   }, [conversations.length]);
 
-  // Cargar información de cuentas y cuotas para el widget
+  // Cargar información de cuentas y cuotas para el widget si no vienen por prop
   useEffect(() => {
+    if (accounts && accounts.length > 0) return;
     async function fetchAccounts() {
       try {
         const res = await fetch('/api/accounts');
@@ -117,19 +151,45 @@ export function Sidebar({
       }
     }
     fetchAccounts();
-  }, [activeAccountEmail]);
+  }, [accounts, activeAccountEmail]);
+
+  const accountsList = accounts && accounts.length > 0 ? accounts : sidebarAccounts;
+
+  const handleAccountSelect = async (accId: string) => {
+    if (onSelectAccount) {
+      await onSelectAccount(accId);
+    } else {
+      try {
+        await fetch('/api/accounts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'set_active', accountId: accId }),
+        });
+        const res = await fetch('/api/accounts');
+        const data = await res.json();
+        if (data.success && data.accounts) {
+          setSidebarAccounts(data.accounts);
+        }
+      } catch (err) {
+        console.error('Error al conmutar cuenta activa:', err);
+      }
+    }
+    setIsAccountMenuOpen(false);
+  };
 
   // Cuenta activa y cálculo de cuotas
   const currentAccount = useMemo(() => {
-    if (!sidebarAccounts || sidebarAccounts.length === 0) return null;
-    if (activeAccountEmail) {
-      return (
-        sidebarAccounts.find((a) => a.email.toLowerCase() === activeAccountEmail.toLowerCase()) ||
-        sidebarAccounts[0]
-      );
+    if (!accountsList || accountsList.length === 0) return null;
+    if (activeAccountId) {
+      const found = accountsList.find((a) => a.id === activeAccountId);
+      if (found) return found;
     }
-    return sidebarAccounts.find((a) => a.isActive) || sidebarAccounts[0];
-  }, [sidebarAccounts, activeAccountEmail]);
+    if (activeAccountEmail) {
+      const found = accountsList.find((a) => a.email.toLowerCase() === activeAccountEmail.toLowerCase());
+      if (found) return found;
+    }
+    return accountsList.find((a) => a.isActive) || accountsList[0];
+  }, [accountsList, activeAccountId, activeAccountEmail]);
 
   const quotaSummary = currentAccount?.quota;
   const quota5hFrac = quotaSummary
@@ -752,66 +812,284 @@ export function Sidebar({
 
       {/* Pie del Sidebar: Widget de Cuenta y Cuotas + Acceso directo a Configuración y Tareas */}
       <div className="p-2.5 border-t border-surface-border bg-sidebar flex flex-col gap-2">
-        {/* Widget de Cuenta y Cuotas en el Sidebar */}
-        <div className="p-2.5 rounded-lg bg-surface border border-surface-border flex flex-col gap-2 shadow-sm">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
-              <span
-                className="font-mono text-[11px] text-slate-200 truncate font-medium"
-                title={currentAccount?.email || activeAccountEmail || 'Cuenta activa'}
-              >
-                {currentAccount?.email || activeAccountEmail || 'Sin cuenta activa'}
-              </span>
-            </div>
-            {currentAccount?.inRotationPool && (
-              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-accent/15 text-accent border border-accent/30 font-medium shrink-0">
-                POOL
-              </span>
-            )}
-          </div>
+        <div className="relative" ref={accountMenuRef}>
+          {/* Popover Desplegable hacia arriba */}
+          {isAccountMenuOpen && (
+            <div className="absolute bottom-full mb-2 left-0 right-0 z-50 bg-surface-elevated border border-surface-border rounded-xl shadow-2xl p-2 flex flex-col gap-1.5 animate-in fade-in slide-in-from-bottom-2 duration-150 max-h-[70vh] overflow-y-auto">
+              {/* Cabecera */}
+              <div className="px-2 py-1 flex items-center justify-between border-b border-surface-border/60 pb-1.5">
+                <span className="text-[10px] font-semibold tracking-wider text-slate-400 uppercase font-mono">
+                  Cuentas Vinculadas ({accountsList.length})
+                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsAccountMenuOpen(false);
+                  }}
+                  className="text-slate-400 hover:text-white p-0.5 rounded transition-colors"
+                  title="Cerrar"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
 
-          {/* Barra de Cuota 5h */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
-              <span>5h: {quota5hPct !== null ? `${quota5hPct}%` : '—'}</span>
-              <span className="text-slate-400">
-                {reset5hText ? `reset: ${reset5hText.replace(/^en\s+/i, '')}` : 'reset: —'}
-              </span>
-            </div>
-            <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  quota5hPct !== null && quota5hPct <= 10
-                    ? 'bg-rose-500'
-                    : quota5hPct !== null && quota5hPct <= 30
-                    ? 'bg-amber-500'
-                    : 'bg-accent'
-                }`}
-                style={{ width: `${quota5hPct !== null ? Math.max(2, Math.min(100, quota5hPct)) : 0}%` }}
-              />
-            </div>
-          </div>
+              {/* Lista de Cuentas */}
+              <div className="flex flex-col gap-1 py-0.5">
+                {accountsList.length === 0 ? (
+                  <div className="p-3 text-center text-slate-500 text-[11px] italic">
+                    No hay cuentas vinculadas
+                  </div>
+                ) : (
+                  accountsList.map((acc) => {
+                    const isSelected = currentAccount?.id === acc.id;
 
-          {/* Barra de Cuota Semanal */}
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
-              <span>Semanal: {quotaWeeklyPct !== null ? `${quotaWeeklyPct}%` : '—'}</span>
-              <span className="text-slate-400">
-                {resetWeeklyText ? `reset: ${resetWeeklyText.replace(/^en\s+/i, '')}` : 'reset: —'}
-              </span>
+                    const accQuota = acc.quota;
+                    const acc5hFrac = accQuota
+                      ? (accQuota.gemini5hRemaining ?? accQuota.thirdParty5hRemaining)
+                      : null;
+                    const accWeeklyFrac = accQuota
+                      ? (accQuota.geminiWeeklyRemaining ?? accQuota.thirdPartyWeeklyRemaining)
+                      : null;
+
+                    const accReset5hIso = accQuota?.gemini5hReset || accQuota?.thirdParty5hReset;
+                    const accResetWeeklyIso = accQuota?.geminiWeeklyReset || accQuota?.thirdPartyWeeklyReset;
+
+                    const acc5hPct = acc5hFrac !== null && acc5hFrac !== undefined ? Math.round(acc5hFrac * 100) : null;
+                    const accWeeklyPct = accWeeklyFrac !== null && accWeeklyFrac !== undefined ? Math.round(accWeeklyFrac * 100) : null;
+
+                    const accReset5hText = formatTimeUntilReset(accReset5hIso);
+                    const accResetWeeklyText = formatTimeUntilReset(accResetWeeklyIso);
+
+                    const isExhausted = isQuotaExhausted(
+                      accQuota?.gemini5hRemaining,
+                      accQuota?.geminiWeeklyRemaining,
+                      accQuota?.gemini5hReset,
+                      accQuota?.geminiWeeklyReset
+                    );
+
+                    return (
+                      <div
+                        key={acc.id}
+                        role="button"
+                        tabIndex={isExhausted ? -1 : 0}
+                        onClick={() => {
+                          if (isExhausted) return;
+                          handleAccountSelect(acc.id);
+                        }}
+                        onKeyDown={(e) => {
+                          if (isExhausted) return;
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleAccountSelect(acc.id);
+                          }
+                        }}
+                        className={`p-2 rounded-lg border text-left flex flex-col gap-1.5 transition-all select-none ${
+                          isExhausted
+                            ? 'bg-canvas/90 border-surface-border-subtle text-slate-500 opacity-50 grayscale-[50%] cursor-not-allowed'
+                            : isSelected
+                            ? 'bg-accent/15 border-accent/40 text-white font-medium shadow-sm'
+                            : 'bg-surface hover:bg-surface-hover border-surface-border text-slate-200 hover:border-surface-border-hover cursor-pointer transition-colors'
+                        }`}
+                        title={
+                          isExhausted
+                            ? `Cuenta agotada: límite de cuota alcanzado (Reset: ${accReset5hText || 'pronto'})`
+                            : isSelected
+                            ? `Cuenta activa: ${acc.email}`
+                            : `Conmutar a: ${acc.email}`
+                        }
+                      >
+                        {/* Fila Superior: Email + Badges */}
+                        <div className="flex items-center justify-between gap-1.5 min-w-0">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div
+                              className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-bold shrink-0 ${
+                                isExhausted
+                                  ? 'bg-slate-800 text-slate-500'
+                                  : isSelected
+                                  ? 'bg-accent/30 text-blue-300'
+                                  : 'bg-surface-elevated text-slate-300'
+                              }`}
+                            >
+                              {acc.email[0]?.toUpperCase() || 'U'}
+                            </div>
+                            <span className="font-mono text-[11px] truncate font-medium">
+                              {acc.email}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            {acc.inRotationPool && (
+                              <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-accent/15 text-accent border border-accent/30 font-medium">
+                                POOL
+                              </span>
+                            )}
+                            {isExhausted ? (
+                              <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-rose-500/20 text-rose-300 border border-rose-500/40 font-semibold flex items-center gap-1">
+                                <span>AGOTADA</span>
+                                {accReset5hText && accReset5hText !== 'Reestablecido' && (
+                                  <span className="opacity-75">({accReset5hText.replace(/^en\s+/i, '')})</span>
+                                )}
+                              </span>
+                            ) : isSelected ? (
+                              <span className="text-[8px] font-mono px-1 py-0.2 rounded bg-accent/20 text-blue-300 border border-accent/40 font-semibold flex items-center gap-0.5">
+                                <Check className="w-2.5 h-2.5 text-blue-400" />
+                                <span>ACTIVA</span>
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        {/* Métricas de Tokens / Cuotas de cada cuenta */}
+                        <div className="flex flex-col gap-1 pt-0.5">
+                          {/* Cuota 5h */}
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center justify-between font-mono text-[9px] text-slate-400">
+                              <span>5h: {acc5hPct !== null ? `${acc5hPct}%` : '—'}</span>
+                              <span className="text-slate-500">
+                                {accReset5hText ? `reset: ${accReset5hText.replace(/^en\s+/i, '')}` : 'reset: —'}
+                              </span>
+                            </div>
+                            <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  acc5hPct !== null && acc5hPct <= 10
+                                    ? 'bg-rose-500'
+                                    : acc5hPct !== null && acc5hPct <= 30
+                                    ? 'bg-amber-500'
+                                    : 'bg-accent'
+                                }`}
+                                style={{ width: `${acc5hPct !== null ? Math.max(2, Math.min(100, acc5hPct)) : 0}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Cuota Semanal */}
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center justify-between font-mono text-[9px] text-slate-400">
+                              <span>Semanal: {accWeeklyPct !== null ? `${accWeeklyPct}%` : '—'}</span>
+                              <span className="text-slate-500">
+                                {accResetWeeklyText ? `reset: ${accResetWeeklyText.replace(/^en\s+/i, '')}` : 'reset: —'}
+                              </span>
+                            </div>
+                            <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
+                              <div
+                                className={`h-full rounded-full transition-all duration-300 ${
+                                  accWeeklyPct !== null && accWeeklyPct <= 10
+                                    ? 'bg-rose-500'
+                                    : accWeeklyPct !== null && accWeeklyPct <= 30
+                                    ? 'bg-amber-500'
+                                    : 'bg-emerald-500'
+                                }`}
+                                style={{ width: `${accWeeklyPct !== null ? Math.max(2, Math.min(100, accWeeklyPct)) : 0}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Pie del Popover: Botón + Añadir o gestionar cuentas */}
+              <div className="pt-1.5 mt-0.5 border-t border-surface-border/60">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsAccountMenuOpen(false);
+                    onOpenSettings('cuentas');
+                  }}
+                  className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs font-medium transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5 text-accent" />
+                  <span>+ Añadir o gestionar cuentas</span>
+                </button>
+              </div>
             </div>
-            <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all duration-300 ${
-                  quotaWeeklyPct !== null && quotaWeeklyPct <= 10
-                    ? 'bg-rose-500'
-                    : quotaWeeklyPct !== null && quotaWeeklyPct <= 30
-                    ? 'bg-amber-500'
-                    : 'bg-emerald-500'
-                }`}
-                style={{ width: `${quotaWeeklyPct !== null ? Math.max(2, Math.min(100, quotaWeeklyPct)) : 0}%` }}
-              />
+          )}
+
+          {/* Widget de Cuenta y Cuotas en el Sidebar (Trigger interactivo) */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => setIsAccountMenuOpen((prev) => !prev)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsAccountMenuOpen((prev) => !prev);
+              }
+            }}
+            className="p-2.5 rounded-lg bg-surface border border-surface-border flex flex-col gap-2 shadow-sm cursor-pointer hover:border-surface-border-hover transition-colors select-none group"
+            title="Haz clic para ver la lista de cuentas y tokens restantes"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+                <span
+                  className="font-mono text-[11px] text-slate-200 truncate font-medium group-hover:text-white transition-colors"
+                  title={currentAccount?.email || activeAccountEmail || 'Cuenta activa'}
+                >
+                  {currentAccount?.email || activeAccountEmail || 'Sin cuenta activa'}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {currentAccount?.inRotationPool && (
+                  <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-accent/15 text-accent border border-accent/30 font-medium">
+                    POOL
+                  </span>
+                )}
+                {isAccountMenuOpen ? (
+                  <ChevronUp className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+                ) : (
+                  <ChevronDown className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+                )}
+              </div>
+            </div>
+
+            {/* Barra de Cuota 5h */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
+                <span>5h: {quota5hPct !== null ? `${quota5hPct}%` : '—'}</span>
+                <span className="text-slate-400">
+                  {reset5hText ? `reset: ${reset5hText.replace(/^en\s+/i, '')}` : 'reset: —'}
+                </span>
+              </div>
+              <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    quota5hPct !== null && quota5hPct <= 10
+                      ? 'bg-rose-500'
+                      : quota5hPct !== null && quota5hPct <= 30
+                      ? 'bg-amber-500'
+                      : 'bg-accent'
+                  }`}
+                  style={{ width: `${quota5hPct !== null ? Math.max(2, Math.min(100, quota5hPct)) : 0}%` }}
+                />
+              </div>
+            </div>
+
+            {/* Barra de Cuota Semanal */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
+                <span>Semanal: {quotaWeeklyPct !== null ? `${quotaWeeklyPct}%` : '—'}</span>
+                <span className="text-slate-400">
+                  {resetWeeklyText ? `reset: ${resetWeeklyText.replace(/^en\s+/i, '')}` : 'reset: —'}
+                </span>
+              </div>
+              <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all duration-300 ${
+                    quotaWeeklyPct !== null && quotaWeeklyPct <= 10
+                      ? 'bg-rose-500'
+                      : quotaWeeklyPct !== null && quotaWeeklyPct <= 30
+                      ? 'bg-amber-500'
+                      : 'bg-emerald-500'
+                  }`}
+                  style={{ width: `${quotaWeeklyPct !== null ? Math.max(2, Math.min(100, quotaWeeklyPct)) : 0}%` }}
+                />
+              </div>
             </div>
           </div>
         </div>
@@ -830,7 +1108,7 @@ export function Sidebar({
 
           <button
             type="button"
-            onClick={onOpenSettings}
+            onClick={() => onOpenSettings()}
             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs transition-colors"
             title="Configuración global y pool"
           >
