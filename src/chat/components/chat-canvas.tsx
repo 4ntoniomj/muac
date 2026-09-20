@@ -171,6 +171,18 @@ export function ChatCanvas({
   const [isCopied, setIsCopied] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
   const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
+  const [fileExplorerWidth, setFileExplorerWidth] = useState<number | null>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('muac_file_explorer_custom_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 260 && parsed <= 1400) {
+          return parsed;
+        }
+      }
+    }
+    return null;
+  });
 
   useEffect(() => {
     const saved = localStorage.getItem('muac_file_explorer_open');
@@ -809,15 +821,18 @@ export function ChatCanvas({
       )}
 
       {/* Contenedor Principal: Chat y Gestor Lateral de Archivos */}
-      <div className="flex-1 min-h-0 flex overflow-hidden">
-        {/* Columna del Chat: Mensajes e Input Bar */}
-        <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+      <div className="flex-1 min-h-0 flex overflow-hidden w-full relative">
+        {/* Espaciador izquierdo flexible (mantiene el chat centrado cuando el panel está cerrado, y ancla su posición cuando se abre) */}
+        <div className="flex-1 min-w-0 hidden xl:block pointer-events-none" />
+
+        {/* Columna Central del Chat (Ancho ergonómico controlado y estable) */}
+        <div className="flex-1 min-w-0 xl:flex-none xl:w-full xl:max-w-4xl xl:shrink-0 flex flex-col min-h-0 relative mx-auto xl:mx-0">
           {/* 1.B. Área de Mensajes y Lectura */}
           <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 max-w-4xl w-full mx-auto scroll-smooth"
+              className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 w-full scroll-smooth"
             >
               {messages.length === 0 ? (
                 /* Empty State: Command Palette / Centro de Trabajo */
@@ -1148,30 +1163,30 @@ export function ChatCanvas({
             </div>
           </div>
 
-      {/* Barra Inferior de Entrada (Input Bar) */}
-      <div className="p-4 border-t border-surface-border bg-sidebar/80 backdrop-blur-sm relative">
-        {/* Botón flotante para volver abajo (solo icono, encima de la barra de escribir mensaje) */}
-        {showScrollBottom && (
-          <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 animate-in fade-in zoom-in-95 duration-200">
-            <button
-              type="button"
-              onClick={scrollToBottom}
-              className="w-9 h-9 rounded-full bg-surface-elevated hover:bg-surface-hover text-slate-200 hover:text-white border border-surface-border shadow-xl hover:shadow-2xl transition-all flex items-center justify-center backdrop-blur-md group hover:border-accent/60 cursor-pointer relative hover:scale-105"
-              title="Volver abajo del todo"
-            >
-              <ArrowDown className="w-4 h-4 text-accent group-hover:translate-y-0.5 transition-transform" />
-              {isStreaming && (
-                <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent border border-surface-elevated" />
-                </span>
-              )}
-            </button>
-          </div>
-        )}
+          {/* Composer (Input Bar) (con w-full p-4 pt-2) */}
+          <div className="p-4 pt-2 w-full relative">
+            {/* Botón flotante para volver abajo (solo icono, encima de la barra de escribir mensaje) */}
+            {showScrollBottom && (
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 animate-in fade-in zoom-in-95 duration-200">
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="w-9 h-9 rounded-full bg-surface-elevated hover:bg-surface-hover text-slate-200 hover:text-white border border-surface-border shadow-xl hover:shadow-2xl transition-all flex items-center justify-center backdrop-blur-md group hover:border-accent/60 cursor-pointer relative hover:scale-105"
+                  title="Volver abajo del todo"
+                >
+                  <ArrowDown className="w-4 h-4 text-accent group-hover:translate-y-0.5 transition-transform" />
+                  {isStreaming && (
+                    <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent border border-surface-elevated" />
+                    </span>
+                  )}
+                </button>
+              </div>
+            )}
 
-        {/* 1.C. Composer (Input Bar) - Estilo Raycast / Cursor (Caja Contenedora Unificada) */}
-        <div className="max-w-4xl w-full mx-auto rounded-xl bg-surface border border-surface-border focus-within:border-accent shadow-lg transition-all p-2.5 flex flex-col gap-2">
+            {/* 1.C. Composer (Input Bar) - Estilo Raycast / Cursor (Caja Contenedora Unificada) */}
+            <div className="w-full rounded-xl bg-surface border border-surface-border focus-within:border-accent shadow-lg transition-all p-2.5 flex flex-col gap-2">
           <input
             type="file"
             ref={fileInputRef}
@@ -1370,19 +1385,28 @@ export function ChatCanvas({
       </div>
     </div>
 
-    {/* Gestor de Archivos Lateral Derecho */}
-        {projectPath && (
-          <FileExplorer
-            workspacePath={projectPath}
-            isOpen={isFileExplorerOpen}
-            onClose={() => {
-              setIsFileExplorerOpen(false);
-              localStorage.setItem('muac_file_explorer_open', 'false');
-            }}
-            onSelectFile={(file) => {
-              setInputText((prev) => `${prev ? prev + ' ' : ''}@${file.relativePath || file.name}`);
-            }}
-          />
+        {/* Zona Derecha: Espaciador o Explorador de Archivos */}
+        {projectPath && isFileExplorerOpen ? (
+          <div
+            style={fileExplorerWidth ? { width: `${fileExplorerWidth}px`, flex: 'none' } : undefined}
+            className={`${fileExplorerWidth ? '' : 'flex-1'} min-w-[320px] h-full overflow-hidden border-l border-surface-border flex flex-col z-20 animate-in fade-in slide-in-from-right-2 duration-150`}
+          >
+            <FileExplorer
+              workspacePath={projectPath}
+              isOpen={isFileExplorerOpen}
+              onClose={() => {
+                setIsFileExplorerOpen(false);
+                localStorage.setItem('muac_file_explorer_open', 'false');
+              }}
+              onSelectFile={(file) => {
+                setInputText((prev) => `${prev ? prev + ' ' : ''}@${file.relativePath || file.name}`);
+              }}
+              onResizeWidth={setFileExplorerWidth}
+            />
+          </div>
+        ) : (
+          /* Si está cerrado, espaciador simétrico para que el chat quede exactamente en el centro */
+          <div className="flex-1 min-w-0 hidden xl:block pointer-events-none" />
         )}
       </div>
 

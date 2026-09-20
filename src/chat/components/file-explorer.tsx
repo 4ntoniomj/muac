@@ -45,6 +45,7 @@ interface FileExplorerProps {
   isOpen: boolean;
   onClose: () => void;
   onSelectFile?: (file: FileItem) => void;
+  onResizeWidth?: (width: number | null) => void;
 }
 
 export function FileExplorer({
@@ -52,6 +53,7 @@ export function FileExplorer({
   isOpen,
   onClose,
   onSelectFile,
+  onResizeWidth,
 }: FileExplorerProps) {
   const [items, setItems] = useState<FileItem[]>([]);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
@@ -59,18 +61,18 @@ export function FileExplorer({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [workspaceName, setWorkspaceName] = useState<string>('');
 
-  // Estado de ancho redimensionable (persistencia en localStorage, límites 220px - 700px)
-  const [panelWidth, setPanelWidth] = useState<number>(() => {
+  // Ancho opcional si se redimensiona manualmente (null = flex-1 fluido que aprovecha todo el espacio disponible)
+  const [manualWidth, setManualWidth] = useState<number | null>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('muac_file_explorer_width');
+      const saved = localStorage.getItem('muac_file_explorer_custom_width');
       if (saved) {
         const parsed = parseInt(saved, 10);
-        if (!isNaN(parsed) && parsed >= 220 && parsed <= 700) {
+        if (!isNaN(parsed) && parsed >= 260 && parsed <= 1200) {
           return parsed;
         }
       }
     }
-    return 320;
+    return null;
   });
   const [isResizing, setIsResizing] = useState(false);
 
@@ -170,13 +172,19 @@ export function FileExplorer({
 
     const handleMouseMove = (e: MouseEvent) => {
       // Al estar en el lateral derecho, el ancho es la distancia desde el cursor hasta el borde derecho de la ventana
-      const newWidth = Math.max(220, Math.min(window.innerWidth - e.clientX, 700));
-      setPanelWidth(newWidth);
+      const newWidth = Math.max(260, Math.min(window.innerWidth - e.clientX, window.innerWidth - 450));
+      if (onResizeWidth) {
+        onResizeWidth(newWidth);
+      } else {
+        setManualWidth(newWidth);
+      }
+      try {
+        localStorage.setItem('muac_file_explorer_custom_width', newWidth.toString());
+      } catch {}
     };
 
     const handleMouseUp = () => {
       setIsResizing(false);
-      localStorage.setItem('muac_file_explorer_width', panelWidth.toString());
     };
 
     window.addEventListener('mousemove', handleMouseMove);
@@ -185,7 +193,7 @@ export function FileExplorer({
       window.removeEventListener('mousemove', handleMouseMove);
       window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [isResizing, panelWidth]);
+  }, [isResizing, onResizeWidth]);
 
   // Copiar ruta de archivo al portapapeles
   const handleCopyPath = (pathText: string) => {
@@ -414,11 +422,24 @@ export function FileExplorer({
             </span>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 ml-auto pr-2">
             {!item.isDirectory && (
-              <span className="text-[10px] text-slate-500 font-mono pr-1">
-                {formatFileSize(item.size)}
-              </span>
+              <div className="flex items-center gap-3 font-mono text-[10px] text-slate-500">
+                {item.modifiedAt && (
+                  <span
+                    className="hidden sm:inline text-slate-600 group-hover:text-slate-500 transition-colors"
+                    title={`Modificado: ${new Date(item.modifiedAt).toLocaleString()}`}
+                  >
+                    {new Date(item.modifiedAt).toLocaleDateString(undefined, {
+                      month: 'short',
+                      day: 'numeric',
+                    })}
+                  </span>
+                )}
+                <span className="text-right">
+                  {formatFileSize(item.size)}
+                </span>
+              </div>
             )}
 
             {/* Acciones flotantes al pasar el cursor */}
@@ -520,8 +541,8 @@ export function FileExplorer({
 
   return (
     <aside
-      style={{ width: `${panelWidth}px` }}
-      className={`h-full bg-sidebar border-l border-surface-border flex flex-col select-none shrink-0 relative font-sans text-xs z-20 ${
+      style={!onResizeWidth && manualWidth ? { width: `${manualWidth}px`, flex: 'none' } : undefined}
+      className={`w-full h-full flex-1 flex flex-col bg-sidebar select-none relative font-sans text-xs z-20 overflow-hidden ${
         isResizing ? '' : 'transition-[width] duration-150'
       }`}
     >
@@ -532,13 +553,20 @@ export function FileExplorer({
           setIsResizing(true);
         }}
         onDoubleClick={() => {
-          setPanelWidth(320);
-          localStorage.setItem('muac_file_explorer_width', '320');
+          if (onResizeWidth) {
+            onResizeWidth(null);
+          } else {
+            setManualWidth(null);
+          }
+          try {
+            localStorage.removeItem('muac_file_explorer_custom_width');
+            localStorage.removeItem('muac_file_explorer_width');
+          } catch {}
         }}
         className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 group flex items-center justify-center transition-colors ${
           isResizing ? 'bg-accent/80' : 'hover:bg-accent/40'
         }`}
-        title="Arrastra para redimensionar el panel (doble clic para restablecer a 320px)"
+        title="Arrastra para redimensionar el panel (doble clic para auto-ajustar al espacio disponible)"
       >
         <div
           className={`w-0.5 h-10 rounded-full transition-colors ${
@@ -548,7 +576,7 @@ export function FileExplorer({
       </div>
 
       {/* Cabecera del Gestor de Archivos */}
-      <div className="h-11 border-b border-surface-border px-3 bg-sidebar/80 flex items-center justify-between">
+      <div className="h-12 border-b border-surface-border bg-sidebar/90 px-3 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
           <Folder className="w-4 h-4 text-accent shrink-0" />
           <span className="font-semibold text-slate-200 truncate text-xs" title={workspaceName || workspacePath}>
@@ -705,8 +733,8 @@ export function FileExplorer({
 
             <div className="flex flex-col gap-1 text-[11px] text-slate-400 font-mono bg-surface-elevated p-2 rounded-md border border-surface-border">
               <div className="flex items-center justify-between truncate">
-                <span className="text-slate-500">Ruta:</span>
-                <span className="text-slate-300 truncate max-w-[180px]" title={selectedItem.relativePath}>
+                <span className="text-slate-500 shrink-0">Ruta:</span>
+                <span className="text-slate-300 truncate flex-1 text-right ml-2" title={selectedItem.relativePath}>
                   /{selectedItem.relativePath}
                 </span>
               </div>
