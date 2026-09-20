@@ -67,13 +67,17 @@ export function getAntigravityBrainDirs(): string[] {
   return candidates.filter((d) => fs.existsSync(/*turbopackIgnore: true*/ d));
 }
 
-interface ConvoSummaryMeta {
+export interface ConvoSummaryMeta {
   title?: string;
   projectPath?: string;
+  isSubagent?: boolean;
+  parentConversationId?: string;
+  nestingDepth?: number;
+  agentName?: string;
 }
 
 /**
- * Carga metadatos de títulos y rutas de proyectos desde conversation_summaries.db de Antigravity.
+ * Carga metadatos de títulos, rutas de proyectos y jerarquía de subagentes desde conversation_summaries.db de Antigravity.
  */
 export function loadAntigravitySummariesMeta(): Map<string, ConvoSummaryMeta> {
   const metaMap = new Map<string, ConvoSummaryMeta>();
@@ -86,10 +90,16 @@ export function loadAntigravitySummariesMeta(): Map<string, ConvoSummaryMeta> {
   for (const dbPath of summaryDbPaths) {
     try {
       const sumDb = new DatabaseSync(dbPath, { readOnly: true });
-      const rows = sumDb.prepare('SELECT conversation_id, title, workspace_uris FROM conversation_summaries').all() as Array<{
+      const rows = sumDb.prepare(`
+        SELECT conversation_id, title, workspace_uris, parent_conversation_id, nesting_depth, agent_name
+        FROM conversation_summaries
+      `).all() as Array<{
         conversation_id: string;
         title?: string;
         workspace_uris?: string;
+        parent_conversation_id?: string;
+        nesting_depth?: number;
+        agent_name?: string;
       }>;
       sumDb.close();
 
@@ -111,9 +121,20 @@ export function loadAntigravitySummariesMeta(): Map<string, ConvoSummaryMeta> {
             // Ignorar JSON inválido
           }
         }
+
+        const isSubagent = Boolean(
+          (row.parent_conversation_id && row.parent_conversation_id.trim().length > 0) ||
+          (typeof row.nesting_depth === 'number' && row.nesting_depth > 0) ||
+          (row.agent_name && row.agent_name.trim().length > 0)
+        );
+
         metaMap.set(row.conversation_id, {
           title: row.title?.trim() || undefined,
           projectPath: projectPath || undefined,
+          isSubagent,
+          parentConversationId: row.parent_conversation_id || undefined,
+          nestingDepth: row.nesting_depth || 0,
+          agentName: row.agent_name || undefined,
         });
       }
     } catch {
@@ -122,6 +143,71 @@ export function loadAntigravitySummariesMeta(): Map<string, ConvoSummaryMeta> {
   }
 
   return metaMap;
+}
+
+/**
+ * Determina si una conversación corresponde a un subagente interno
+ * basándose en metadatos de Antigravity o en el contenido del prompt inicial.
+ */
+export function isSubagentConversation(
+  meta?: ConvoSummaryMeta,
+  firstUserPrompt?: string
+): boolean {
+  if (meta?.isSubagent) return true;
+
+  if (firstUserPrompt) {
+    const trimmed = firstUserPrompt.trim();
+    if (
+      /^(?:Lee\s+[`'"]?(?:src\/|[a-zA-Z0-9_\-\.\/]+\/)?AGENTS\.md|Actúa como el subagente|Actua como el subagente|Tu tarea es aplicar|<SUBAGENT>|Investiga en profundidad la base de código)/i.test(
+        trimmed
+      )
+    ) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
+ * Elimina de la base de datos de MUAC (muac.db) todas las conversaciones
+ * y mensajes que correspondan a subagentes internos de Antigravity.
+ */
+export function purgeSubagentConversations(): number {
+  const db = getDatabase();
+  const summariesMeta = loadAntigravitySummariesMeta();
+
+  const convos = db.prepare('SELECT id, title FROM conversations').all() as Array<{
+    id: string;
+    title: string;
+  }>;
+
+  const toDelete: string[] = [];
+
+  for (const convo of convos) {
+    const meta = summariesMeta.get(convo.id);
+    if (meta?.isSubagent) {
+      toDelete.push(convo.id);
+      continue;
+    }
+
+    // Comprobar si el primer mensaje en la BD es de subagente
+    const firstMsg = db.prepare(
+      "SELECT content FROM messages WHERE conversation_id = ? AND role = 'user' ORDER BY created_at ASC LIMIT 1"
+    ).get(convo.id) as { content?: string } | undefined;
+
+    if (isSubagentConversation(meta, firstMsg?.content || convo.title)) {
+      toDelete.push(convo.id);
+    }
+  }
+
+  if (toDelete.length === 0) return 0;
+
+  const placeholders = toDelete.map(() => '?').join(',');
+  db.prepare(`DELETE FROM messages WHERE conversation_id IN (${placeholders})`).run(...toDelete);
+  db.prepare(`DELETE FROM conversations WHERE id IN (${placeholders})`).run(...toDelete);
+
+  return toDelete.length;
 }
 
 /**
@@ -142,6 +228,9 @@ export async function syncAntigravityConversations(): Promise<SyncResult> {
 
   const processedConvoIds = new Set<string>();
 
+  // 1. Purgar previamente cualquier conversación de subagentes existente en muac.db
+  purgeSubagentConversations();
+
   for (const brainDir of brainDirs) {
     let entries: string[] = [];
     try {
@@ -153,6 +242,12 @@ export async function syncAntigravityConversations(): Promise<SyncResult> {
 
     for (const convoId of entries) {
       if (processedConvoIds.has(convoId)) continue;
+
+      const summaryMeta = summariesMeta.get(convoId);
+      // Omitir subagentes identificados por metadatos (parent_conversation_id, nesting_depth, agent_name)
+      if (summaryMeta?.isSubagent) {
+        continue;
+      }
 
       const transcriptPath = path.join(brainDir, convoId, '.system_generated', 'logs', 'transcript.jsonl');
       if (!fs.existsSync(/*turbopackIgnore: true*/ transcriptPath)) continue;
@@ -233,7 +328,11 @@ export async function syncAntigravityConversations(): Promise<SyncResult> {
 
         if (parsedMessages.length === 0) continue;
 
-        const summaryMeta = summariesMeta.get(convoId);
+        // Omitir si el contenido inicial corresponde a una sesión de subagente
+        if (isSubagentConversation(summaryMeta, firstUserPrompt)) {
+          continue;
+        }
+
         const convoProjectPath = summaryMeta?.projectPath || null;
 
         // Determinar título

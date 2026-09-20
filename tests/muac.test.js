@@ -1291,5 +1291,70 @@ test('Sidebar Account Popover: Determinación de estilos visuales para cuentas a
   assert.ok(availableStyle.includes('bg-surface'), 'Cuenta disponible debe usar fondo surface estándar');
 });
 
+// 55. Verificación de Exclusión de Subagentes en Sincronización de Antigravity
+test('Antigravity Sync: Exclusión estricta de subagentes por metadata (parent, depth, agent) y prompts de delegación', () => {
+  const isSubagentConversation = (meta, firstUserPrompt) => {
+    if (meta?.isSubagent) return true;
+    if (firstUserPrompt) {
+      const trimmed = firstUserPrompt.trim();
+      if (
+        /^(?:Lee\s+[`'"]?(?:src\/|[a-zA-Z0-9_\-\.\/]+\/)?AGENTS\.md|Actúa como el subagente|Actua como el subagente|Tu tarea es aplicar|<SUBAGENT>|Investiga en profundidad la base de código)/i.test(
+          trimmed
+        )
+      ) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  // 1. Detección por parent_conversation_id
+  assert.equal(
+    isSubagentConversation({ isSubagent: true, parentConversationId: 'parent-123' }, 'Hola asistente'),
+    true,
+    'Debe clasificar como subagente si tiene parentConversationId'
+  );
+
+  // 2. Detección por agent_name y nesting_depth
+  assert.equal(
+    isSubagentConversation({ isSubagent: true, agentName: 'chat-builder', nestingDepth: 1 }),
+    true,
+    'Debe clasificar como subagente si tiene agentName y nestingDepth'
+  );
+
+  // 3. Detección heurística por prompt de delegación técnica
+  assert.equal(
+    isSubagentConversation(
+      { isSubagent: false },
+      'Lee `src/chat/AGENTS.md`. Actúa como el subagente `chat-builder` del dominio Chat.'
+    ),
+    true,
+    'Debe clasificar como subagente si el prompt inicial es una directiva de delegación'
+  );
+
+  assert.equal(
+    isSubagentConversation(
+      undefined,
+      'Investiga en profundidad la base de código de muac y busca errores'
+    ),
+    true,
+    'Debe clasificar como subagente si el prompt inicial es de investigación delegada'
+  );
+
+  // 4. Conversaciones legítimas del usuario NO deben ser excluidas
+  assert.equal(
+    isSubagentConversation({ isSubagent: false, title: 'Mi conversación de trabajo' }, '¿Cómo implemento una cola en TypeScript?'),
+    false,
+    'Una conversación normal de usuario NO debe clasificarse como subagente'
+  );
+
+  assert.equal(
+    isSubagentConversation(undefined, 'Quiero que hagas un rediseño visual completo del frontend de muac'),
+    false,
+    'Una petición de usuario válida NO debe clasificarse como subagente'
+  );
+});
+
+
 
 
