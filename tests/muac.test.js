@@ -1355,6 +1355,61 @@ test('Antigravity Sync: Exclusión estricta de subagentes por metadata (parent, 
   );
 });
 
+// 56. Verificación de Selección de Todos los Chats de un Proyecto
+test('Sidebar: handleToggleSelectProject selecciona y deselecciona todos los chats de un proyecto', () => {
+  const projectConvos = [
+    { id: 'c1', title: 'Chat 1' },
+    { id: 'c2', title: 'Chat 2' },
+    { id: 'c3', title: 'Chat 3' },
+  ];
+
+  let selectedIds = new Set(['c_other']);
+  let isSelectMode = true;
+
+  const toggleSelectProject = (convos) => {
+    const projectIds = convos.map((c) => c.id);
+    const allInProjectSelected = projectIds.every((id) => selectedIds.has(id));
+
+    const next = new Set(selectedIds);
+    if (allInProjectSelected) {
+      projectIds.forEach((id) => next.delete(id));
+      if (next.size === 0) isSelectMode = false;
+    } else {
+      projectIds.forEach((id) => next.add(id));
+      isSelectMode = true;
+    }
+    selectedIds = next;
+  };
+
+  // 1. Cuando ninguno de los chats del proyecto está seleccionado
+  toggleSelectProject(projectConvos);
+  assert.equal(selectedIds.has('c1'), true);
+  assert.equal(selectedIds.has('c2'), true);
+  assert.equal(selectedIds.has('c3'), true);
+  assert.equal(selectedIds.has('c_other'), true, 'Debe preservar chats seleccionados previamente');
+  assert.equal(isSelectMode, true);
+
+  // 2. Cuando todos los chats del proyecto están seleccionados -> Deseleccionar
+  toggleSelectProject(projectConvos);
+  assert.equal(selectedIds.has('c1'), false);
+  assert.equal(selectedIds.has('c2'), false);
+  assert.equal(selectedIds.has('c3'), false);
+  assert.equal(selectedIds.has('c_other'), true, 'Solo debe deseleccionar los chats del proyecto indicado');
+
+  // 3. Cuando solo algunos chats del proyecto están seleccionados -> Debe completar la selección
+  selectedIds = new Set(['c1']);
+  toggleSelectProject(projectConvos);
+  assert.equal(selectedIds.has('c1'), true);
+  assert.equal(selectedIds.has('c2'), true);
+  assert.equal(selectedIds.has('c3'), true);
+
+  // 4. Si se deseleccionan todos y queda vacío -> isSelectMode pasa a false
+  toggleSelectProject(projectConvos);
+  assert.equal(selectedIds.size, 0);
+  assert.equal(isSelectMode, false);
+});
+
+
 
 
 

@@ -235,6 +235,26 @@ export function Sidebar({
     });
   };
 
+  const handleToggleSelectProject = (projectConvos: Conversation[], e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const projectIds = projectConvos.map((c) => c.id);
+    if (projectIds.length === 0) return;
+
+    const allInProjectSelected = projectIds.every((id) => selectedIds.has(id));
+
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allInProjectSelected) {
+        projectIds.forEach((id) => next.delete(id));
+        if (next.size === 0) setIsSelectMode(false);
+      } else {
+        projectIds.forEach((id) => next.add(id));
+        setIsSelectMode(true);
+      }
+      return next;
+    });
+  };
+
   const handleRequestSingleDelete = (convo: Conversation, e: React.MouseEvent) => {
     e.stopPropagation();
     setConfirmModal({
@@ -738,16 +758,21 @@ export function Sidebar({
             ) : (
               displayProjects.map((project) => {
                 const isCollapsed = collapsedProjects.has(project.name);
+                const isProjectAllSelected =
+                  project.convos.length > 0 && project.convos.every((c) => selectedIds.has(c.id));
+                const isProjectSomeSelected =
+                  project.convos.some((c) => selectedIds.has(c.id)) && !isProjectAllSelected;
+
                 return (
                   <div key={project.id} className="flex flex-col">
                     {/* Fila del Proyecto / Carpeta */}
-                    <button
-                      type="button"
-                      onClick={() => toggleProjectCollapse(project.name)}
-                      className="flex items-center justify-between px-1.5 py-1 text-slate-400 hover:text-slate-200 hover:bg-surface-hover transition-colors rounded-md group text-left"
-                      title={project.path}
-                    >
-                      <div className="flex items-center gap-2 truncate">
+                    <div className="flex items-center justify-between px-1.5 py-1 text-slate-400 hover:text-slate-200 hover:bg-surface-hover transition-colors rounded-md group">
+                      <button
+                        type="button"
+                        onClick={() => toggleProjectCollapse(project.name)}
+                        className="flex items-center gap-2 truncate flex-1 text-left cursor-pointer"
+                        title={project.path}
+                      >
                         {isCollapsed ? (
                           <Folder className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         ) : (
@@ -756,11 +781,46 @@ export function Sidebar({
                         <span className="font-normal text-slate-300 truncate text-[13px]">
                           {project.name}
                         </span>
+                      </button>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        {/* Botón para seleccionar todos los chats del proyecto */}
+                        {project.convos.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleSelectProject(project.convos, e)}
+                            className={`p-1 rounded transition-opacity cursor-pointer ${
+                              isProjectAllSelected
+                                ? 'text-accent opacity-100'
+                                : isProjectSomeSelected
+                                ? 'text-blue-400 opacity-100'
+                                : isSelectMode
+                                ? 'text-slate-500 hover:text-slate-200 opacity-100'
+                                : 'text-slate-500 hover:text-slate-200 opacity-0 group-hover:opacity-100'
+                            }`}
+                            title={
+                              isProjectAllSelected
+                                ? `Deseleccionar todos los chats de ${project.name}`
+                                : `Seleccionar todos los chats de ${project.name} (${project.convos.length})`
+                            }
+                          >
+                            {isProjectAllSelected ? (
+                              <CheckSquare className="w-3.5 h-3.5 text-accent" />
+                            ) : isProjectSomeSelected ? (
+                              <div className="w-3.5 h-3.5 border border-accent rounded-sm flex items-center justify-center bg-accent/20">
+                                <div className="w-1.5 h-1.5 bg-accent rounded-xs" />
+                              </div>
+                            ) : (
+                              <Square className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        )}
+
+                        <span className="text-[10px] text-slate-500 font-mono">
+                          {project.convos.length}
+                        </span>
                       </div>
-                      <span className="text-[10px] text-slate-500 font-mono">
-                        {project.convos.length}
-                      </span>
-                    </button>
+                    </div>
 
                     {/* Lista de Conversaciones bajo el proyecto */}
                     {!isCollapsed && (
@@ -783,19 +843,51 @@ export function Sidebar({
 
         {/* SECCIÓN 2: CONVERSACIONES (Globales / Sin Proyecto) */}
         <div className="flex flex-col gap-1 pt-1 border-t border-surface-border">
-          <div className="flex items-center justify-between px-1 py-1 text-slate-400 text-xs font-medium">
+          <div className="flex items-center justify-between px-1 py-1 text-slate-400 text-xs font-medium group">
             <div className="flex items-center gap-1.5">
               <span>Conversaciones</span>
               <span className="text-[10px] text-slate-500 font-mono">({filteredStandalone.length})</span>
             </div>
-            <button
-              type="button"
-              onClick={() => onNewConversation('outside-of-project')}
-              className="text-slate-500 hover:text-slate-300 transition-colors p-0.5"
-              title="Nueva conversación sin proyecto"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
+            <div className="flex items-center gap-1">
+              {filteredStandalone.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => handleToggleSelectProject(filteredStandalone, e)}
+                  className={`p-1 rounded transition-opacity cursor-pointer ${
+                    filteredStandalone.every((c) => selectedIds.has(c.id))
+                      ? 'text-accent opacity-100'
+                      : filteredStandalone.some((c) => selectedIds.has(c.id))
+                      ? 'text-blue-400 opacity-100'
+                      : isSelectMode
+                      ? 'text-slate-500 hover:text-slate-200 opacity-100'
+                      : 'text-slate-500 hover:text-slate-200 opacity-0 group-hover:opacity-100'
+                  }`}
+                  title={
+                    filteredStandalone.every((c) => selectedIds.has(c.id))
+                      ? 'Deseleccionar todas las conversaciones'
+                      : `Seleccionar todas las conversaciones (${filteredStandalone.length})`
+                  }
+                >
+                  {filteredStandalone.every((c) => selectedIds.has(c.id)) ? (
+                    <CheckSquare className="w-3.5 h-3.5 text-accent" />
+                  ) : filteredStandalone.some((c) => selectedIds.has(c.id)) ? (
+                    <div className="w-3.5 h-3.5 border border-accent rounded-sm flex items-center justify-center bg-accent/20">
+                      <div className="w-1.5 h-1.5 bg-accent rounded-xs" />
+                    </div>
+                  ) : (
+                    <Square className="w-3.5 h-3.5" />
+                  )}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onNewConversation('outside-of-project')}
+                className="text-slate-500 hover:text-slate-300 transition-colors p-0.5 cursor-pointer"
+                title="Nueva conversación sin proyecto"
+              >
+                <Plus className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col gap-0.5 mt-0.5">
