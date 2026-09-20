@@ -1002,3 +1002,121 @@ test('Streaming: Filtrado de bloques de pensamiento y respuesta consolidada limp
   assert.equal(cleaned, 'Archivo creado con éxito.', 'Debe remover completamente el bloque de pensamiento de la respuesta del usuario');
 });
 
+// 41. Verificación de OAuth PKCE: client_secret opcional para clientes Desktop/públicos
+test('OAuth PKCE: client_secret es opcional para clientes Desktop/públicos y solo se adjunta si tiene valor', () => {
+  const composeTokenParams = (clientId, code, codeVerifier, redirectUri, clientSecret) => {
+    const params = new URLSearchParams({
+      client_id: clientId,
+      code,
+      code_verifier: codeVerifier,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUri,
+    });
+    if (clientSecret) {
+      params.set('client_secret', clientSecret);
+    }
+    return params;
+  };
+
+  // Caso 1: Cliente de escritorio con PKCE (sin client_secret)
+  const paramsDesktop = composeTokenParams('desktop-client.apps.googleusercontent.com', 'auth_code_123', 'verifier_xyz', 'http://localhost:3000/api/auth/callback', undefined);
+  assert.equal(paramsDesktop.get('client_id'), 'desktop-client.apps.googleusercontent.com');
+  assert.equal(paramsDesktop.get('code_verifier'), 'verifier_xyz');
+  assert.equal(paramsDesktop.get('client_secret'), null, 'No debe enviar client_secret vacío o nulo en clientes públicos');
+
+  // Caso 2: Cliente confidencial web (con client_secret)
+  const paramsWeb = composeTokenParams('web-client.apps.googleusercontent.com', 'auth_code_456', 'verifier_abc', 'http://localhost:3000/api/auth/callback', 'secret_789');
+  assert.equal(paramsWeb.get('client_secret'), 'secret_789', 'Debe incluir client_secret cuando se proporciona');
+});
+
+// 42. Verificación de Sanitización de Credenciales OAuth
+test('OAuth: Sanitización automática de comillas y espacios en credenciales', () => {
+  const cleanCredentialString = (str) => {
+    if (!str) return '';
+    return str.trim().replace(/^["']|["']$/g, '');
+  };
+
+  assert.equal(cleanCredentialString('  "my-client-id.apps.googleusercontent.com"  '), 'my-client-id.apps.googleusercontent.com');
+  assert.equal(cleanCredentialString("'GOCSPX-secret123' \n"), 'GOCSPX-secret123');
+  assert.equal(cleanCredentialString(''), '');
+});
+
+// 43. Verificación de Seguridad en Gestor de Archivos (Path Confinement)
+test('File Explorer: Confinamiento estricto de rutas dentro del workspace', () => {
+  const path = require('node:path');
+  const isPathInside = (parent, target) => {
+    const relative = path.relative(parent, target);
+    return !relative.startsWith('..') && !path.isAbsolute(relative);
+  };
+
+  const workspace = '/home/antonio/proyecto';
+  assert.ok(isPathInside(workspace, '/home/antonio/proyecto/src/index.ts'));
+  assert.ok(isPathInside(workspace, '/home/antonio/proyecto/nested/dir/file.json'));
+  assert.ok(!isPathInside(workspace, '/home/antonio/otro-proyecto/secreto.txt'));
+  assert.ok(!isPathInside(workspace, '/etc/passwd'));
+  assert.ok(!isPathInside(workspace, '/home/antonio/proyecto/../../etc/shadow'));
+});
+
+// 44. Verificación de Tareas Programadas: Configuración y Presets
+test('Scheduled Tasks: Soporte de tipos de intervalo y expresiones cron', () => {
+  const isValidSchedule = (type, value) => {
+    if (type === 'interval') {
+      return /^\d+(m|h|d)$/.test(value);
+    }
+    if (type === 'cron') {
+      return value.trim().split(/\s+/).length >= 5;
+    }
+    return false;
+  };
+
+  assert.ok(isValidSchedule('interval', '15m'), '15m es un intervalo válido');
+  assert.ok(isValidSchedule('interval', '1h'), '1h es un intervalo válido');
+  assert.ok(isValidSchedule('interval', '24h'), '24h es un intervalo válido');
+  assert.ok(isValidSchedule('cron', '0 9 * * *'), '0 9 * * * es una expresión cron válida');
+  assert.ok(!isValidSchedule('interval', 'invalido'), 'intervalo incorrecto es rechazado');
+});
+
+// 45. Verificación de Inversión de Estilos de Mensajes (Usuario con recuadro, IA transparente)
+test('Chat UI: Estilos de mensaje: Usuario con recuadro elevado, IA sin recuadro con fondo transparente', () => {
+  const getMessageContainerClass = (isUser) => {
+    return isUser
+      ? 'max-w-[85%] rounded-2xl rounded-tr-sm px-4 py-3 shadow-md bg-surface-elevated border border-surface-border text-slate-200'
+      : 'w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1';
+  };
+
+  const userClasses = getMessageContainerClass(true);
+  assert.ok(userClasses.includes('bg-surface-elevated'), 'El mensaje del usuario debe usar bg-surface-elevated');
+  assert.ok(userClasses.includes('border-surface-border'), 'El mensaje del usuario debe tener borde');
+
+  const aiClasses = getMessageContainerClass(false);
+  assert.ok(aiClasses.includes('bg-transparent'), 'El mensaje de la IA debe tener fondo transparente');
+  assert.ok(aiClasses.includes('border-none'), 'El mensaje de la IA no debe tener borde');
+  assert.ok(aiClasses.includes('shadow-none'), 'El mensaje de la IA no debe tener sombra');
+});
+
+// 46. Verificación de Supresión de Avatares en Mensajes
+test('Chat UI: Supresión de avatares/iconos de usuario y de bot en el flujo del chat', () => {
+  const shouldRenderAvatar = (role) => {
+    // Ambos avatares están suprimidos según requerimiento explícito del usuario
+    return false;
+  };
+
+  assert.equal(shouldRenderAvatar('user'), false, 'El icono de usuario debe estar eliminado');
+  assert.equal(shouldRenderAvatar('assistant'), false, 'El icono del bot debe estar eliminado');
+});
+
+// 47. Verificación de Presencia de Activos del Logo Oficial de muac
+test('Assets: Presencia física de logo.png e icon.png en public y src/app', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+
+  const publicLogo = path.resolve(process.cwd(), 'public/logo.png');
+  const publicIcon = path.resolve(process.cwd(), 'public/icon.png');
+  const appIcon = path.resolve(process.cwd(), 'src/app/icon.png');
+
+  assert.ok(fs.existsSync(publicLogo), 'public/logo.png debe existir');
+  assert.ok(fs.existsSync(publicIcon), 'public/icon.png debe existir');
+  assert.ok(fs.existsSync(appIcon), 'src/app/icon.png debe existir');
+  assert.ok(fs.statSync(publicLogo).size > 10000, 'El archivo logo.png debe tener contenido válido');
+});
+

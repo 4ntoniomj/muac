@@ -27,24 +27,30 @@ export async function GET(req: Request) {
     console.error('Error al guardar estado OAuth en DB:', err);
   }
 
-  const authUrl = getGoogleAuthUrl(redirectUri, verifier, state);
+  try {
+    const authUrl = getGoogleAuthUrl(redirectUri, verifier, state);
 
-  const response = NextResponse.redirect(authUrl);
-  // Guardar verifier también en cookie para soporte dual
-  response.cookies.set('muac_pkce_verifier', verifier, {
-    httpOnly: true,
-    secure: protocol === 'https',
-    sameSite: 'lax',
-    maxAge: 600, // 10 minutos
-    path: '/',
-  });
-  response.cookies.set('muac_pkce_state', state, {
-    httpOnly: true,
-    secure: protocol === 'https',
-    sameSite: 'lax',
-    maxAge: 600,
-    path: '/',
-  });
+    const response = NextResponse.redirect(authUrl);
+    // Guardar verifier también en cookie para soporte dual
+    response.cookies.set('muac_pkce_verifier', verifier, {
+      httpOnly: true,
+      secure: protocol === 'https',
+      sameSite: 'lax',
+      maxAge: 600, // 10 minutos
+      path: '/',
+    });
+    response.cookies.set('muac_pkce_state', state, {
+      httpOnly: true,
+      secure: protocol === 'https',
+      sameSite: 'lax',
+      maxAge: 600,
+      path: '/',
+    });
 
-  return response;
+    return response;
+  } catch (err) {
+    console.error('Error al iniciar flujo OAuth de Google:', err);
+    const msg = (err as Error).message || 'Faltan credenciales de Google OAuth';
+    return NextResponse.redirect(`${protocol}://${host}/?auth_error=${encodeURIComponent(msg)}`);
+  }
 }

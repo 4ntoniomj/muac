@@ -4,6 +4,10 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'muac · Antigravity Pro Multi-Account',
   description: 'Chat de inteligencia artificial con rotación automática de cuentas Antigravity Pro por límites de tokens.',
+  icons: {
+    icon: '/icon.png',
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({

@@ -1,5 +1,8 @@
 import crypto from 'node:crypto';
+import fs from 'node:fs';
+import path from 'node:path';
 import type { StoredToken } from '@/shared/types/account';
+import { getGlobalSettings } from '@/configuracion/settings-store';
 
 export const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
 export const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
@@ -9,6 +12,72 @@ export const GOOGLE_SCOPES = [
   'https://www.googleapis.com/auth/userinfo.profile',
   'https://www.googleapis.com/auth/cloud-platform',
 ].join(' ');
+
+export interface GoogleCredentials {
+  clientId: string;
+  clientSecret?: string;
+  source: 'env' | 'settings' | 'file' | 'none';
+}
+
+function cleanCredentialString(str?: string): string {
+  if (!str) return '';
+  return str.trim().replace(/^["']|["']$/g, '');
+}
+
+/**
+ * Resuelve de forma inteligente las credenciales de Google OAuth:
+ * 1. Variables de entorno (.env)
+ * 2. Ajustes persistidos en la base de datos (settings_store)
+ * 3. Archivos descargados de Google Cloud Console (client_secret*.json, credentials.json)
+ */
+export function resolveGoogleOAuthCredentials(): GoogleCredentials {
+  const envClientId = cleanCredentialString(process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID);
+  const envClientSecret = cleanCredentialString(process.env.GOOGLE_CLIENT_SECRET || GOOGLE_CLIENT_SECRET);
+  if (envClientId) {
+    return {
+      clientId: envClientId,
+      clientSecret: envClientSecret || undefined,
+      source: 'env',
+    };
+  }
+
+  try {
+    const settings = getGlobalSettings();
+    const settingsClientId = cleanCredentialString(settings.googleClientId);
+    const settingsClientSecret = cleanCredentialString(settings.googleClientSecret);
+    if (settingsClientId) {
+      return {
+        clientId: settingsClientId,
+        clientSecret: settingsClientSecret || undefined,
+        source: 'settings',
+      };
+    }
+  } catch {}
+
+  try {
+    const rootDir = process.cwd();
+    const files = fs.readdirSync(/*turbopackIgnore: true*/ rootDir);
+    const secretFile = files.find((f) =>
+      (f.startsWith('client_secret') && f.endsWith('.json')) ||
+      f === 'credentials.json' ||
+      f === 'client_secrets.json'
+    );
+    if (secretFile) {
+      const content = fs.readFileSync(path.join(/*turbopackIgnore: true*/ rootDir, secretFile), 'utf-8');
+      const parsed = JSON.parse(content);
+      const creds = parsed.web || parsed.installed;
+      if (creds && creds.client_id) {
+        return {
+          clientId: cleanCredentialString(creds.client_id),
+          clientSecret: cleanCredentialString(creds.client_secret) || undefined,
+          source: 'file',
+        };
+      }
+    }
+  } catch {}
+
+  return { clientId: '', clientSecret: undefined, source: 'none' };
+}
 
 export interface PKCEPair {
   verifier: string;
@@ -25,9 +94,9 @@ export function generatePKCE(): PKCEPair {
 }
 
 export function getGoogleAuthUrl(redirectUri: string, verifier: string, state?: string): string {
-  const clientId = process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID;
+  const { clientId } = resolveGoogleOAuthCredentials();
   if (!clientId) {
-    throw new Error('Falta configurar GOOGLE_CLIENT_ID en las variables de entorno (.env).');
+    throw new Error('Falta configurar GOOGLE_CLIENT_ID en .env, ajustes o archivo de credenciales de Google.');
   }
 
   const challenge = crypto
@@ -41,9 +110,6 @@ export function getGoogleAuthUrl(redirectUri: string, verifier: string, state?: 
     response_type: 'code',
     scope: GOOGLE_SCOPES,
     access_type: 'offline',
-    // prompt=select_account es la clave técnica esencial para obligar a Google
-    // a mostrar el selector de cuentas ("Elige una cuenta / Usar otra cuenta")
-    // y no heredar pasivamente la sesión de la primera cuenta ya logueada.
     prompt: 'select_account',
     code_challenge: challenge,
     code_challenge_method: 'S256',
@@ -68,20 +134,24 @@ export async function exchangeCodeForTokens(
   codeVerifier: string,
   redirectUri: string
 ): Promise<TokenExchangeResult> {
-  const clientId = process.env.GOOGLE_CLIENT_ID || GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET || GOOGLE_CLIENT_SECRET;
-  if (!clientId || !clientSecret) {
-    throw new Error('Faltan GOOGLE_CLIENT_ID o GOOGLE_CLIENT_SECRET en las variables de entorno (.env).');
+  const { clientId, clientSecret } = resolveGoogleOAuthCredentials();
+  if (!clientId) {
+    throw new Error('Falta configurar GOOGLE_CLIENT_ID en las variables de entorno, ajustes o archivo JSON.');
   }
 
   const params = new URLSearchParams({
     client_id: clientId,
-    client_secret: clientSecret,
     code,
     code_verifier: codeVerifier,
     grant_type: 'authorization_code',
     redirect_uri: redirectUri,
   });
+
+  // Solo adjuntar client_secret si está disponible y no vacío
+  // (clientes confidenciales). En clientes de escritorio con PKCE, se omite.
+  if (clientSecret) {
+    params.set('client_secret', clientSecret);
+  }
 
   const response = await fetch('https://oauth2.googleapis.com/token', {
     method: 'POST',

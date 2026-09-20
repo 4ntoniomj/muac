@@ -41,7 +41,12 @@ import {
   Volume2,
   Play,
   ArrowDown,
+  Folder,
+  FolderTree,
+  PanelRight,
+  PanelRightClose,
 } from 'lucide-react';
+import { FileExplorer } from './file-explorer';
 
 interface ChatCanvasProps {
   messages: Message[];
@@ -106,6 +111,16 @@ export function ChatCanvas({
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [showScrollBottom, setShowScrollBottom] = useState(false);
+  const [isFileExplorerOpen, setIsFileExplorerOpen] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem('muac_file_explorer_open');
+    if (saved !== null) {
+      setIsFileExplorerOpen(saved === 'true');
+    } else if (projectPath) {
+      setIsFileExplorerOpen(true);
+    }
+  }, [projectPath]);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -571,6 +586,26 @@ export function ChatCanvas({
           <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-elevated/70 border border-surface-border">
             {messages.length} {messages.length === 1 ? 'mensaje' : 'mensajes'}
           </span>
+
+          {projectPath && (
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isFileExplorerOpen;
+                setIsFileExplorerOpen(next);
+                localStorage.setItem('muac_file_explorer_open', String(next));
+              }}
+              className={`p-1.5 rounded-xl transition-all border flex items-center gap-1.5 text-xs ${
+                isFileExplorerOpen
+                  ? 'bg-amber-950/60 text-amber-300 border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-surface-elevated border-transparent hover:border-surface-border'
+              }`}
+              title={isFileExplorerOpen ? 'Ocultar explorador de archivos' : 'Mostrar explorador de archivos del proyecto'}
+            >
+              <FolderTree className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline text-[11px] font-medium">Archivos</span>
+            </button>
+          )}
         </div>
       </header>
       {/* Indicador visual de Drag and Drop */}
@@ -634,17 +669,21 @@ export function ChatCanvas({
         </div>
       )}
 
-      {/* Área de Mensajes */}
-      <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
-        <div
-          ref={messagesContainerRef}
+      {/* Contenedor Principal: Chat y Gestor Lateral de Archivos */}
+      <div className="flex-1 min-h-0 flex overflow-hidden">
+        {/* Columna del Chat: Mensajes e Input Bar */}
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
+          {/* Área de Mensajes */}
+          <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
+            <div
+              ref={messagesContainerRef}
           onScroll={handleScroll}
           className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6 max-w-4xl w-full mx-auto scroll-smooth"
         >
         {messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 select-none">
-            <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-xl shadow-blue-500/20 text-white mb-4">
-              <Sparkles className="w-7 h-7 text-white" />
+            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-xl shadow-blue-500/20 mb-4 bg-surface-elevated/40 border border-white/10 flex items-center justify-center p-1">
+              <img src="/logo.png" alt="muac" className="w-full h-full object-contain" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">muac · Antigravity Pro</h3>
             <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
@@ -680,21 +719,15 @@ export function ChatCanvas({
             return (
               <div
                 key={msg.id}
-                className={`flex gap-3.5 text-xs leading-relaxed ${
+                className={`flex text-xs leading-relaxed ${
                   isUser ? 'justify-end' : 'justify-start'
                 }`}
               >
-                {!isUser && (
-                  <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5">
-                    <Bot className="w-4 h-4" />
-                  </div>
-                )}
-
                 <div
-                  className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-md flex flex-col gap-2.5 ${
+                  className={`flex flex-col gap-2.5 transition-all ${
                     isUser
-                      ? 'bg-blue-600 text-white rounded-tr-sm'
-                      : 'bg-surface-elevated border border-surface-border text-slate-200 rounded-tl-sm'
+                      ? 'max-w-[85%] rounded-2xl rounded-tr-sm px-4 py-3 shadow-md bg-surface-elevated border border-surface-border text-slate-200'
+                      : 'w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1'
                   }`}
                 >
                   {/* Adjuntos del Mensaje (Fotos, Videos, Audios, Archivos) */}
@@ -726,8 +759,8 @@ export function ChatCanvas({
                             <div
                               className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
                                 isUser
-                                  ? 'bg-blue-700/70 border-blue-500/50 text-white'
-                                  : 'bg-surface border-surface-border text-slate-200'
+                                  ? 'bg-black/30 border-surface-border/60 text-slate-200'
+                                  : 'bg-surface-elevated border-surface-border text-slate-200'
                               }`}
                             >
                               <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
@@ -745,8 +778,8 @@ export function ChatCanvas({
                             <div
                               className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-all ${
                                 isUser
-                                  ? 'bg-blue-700/60 border-blue-500/40 text-white'
-                                  : 'bg-surface border-surface-border text-slate-200'
+                                  ? 'bg-black/30 border-surface-border/60 text-slate-200'
+                                  : 'bg-surface-elevated border-surface-border text-slate-200'
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -834,12 +867,6 @@ export function ChatCanvas({
                     </div>
                   )}
                 </div>
-
-                {isUser && (
-                  <div className="w-7 h-7 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 shrink-0 mt-0.5">
-                    <User className="w-4 h-4" />
-                  </div>
-                )}
               </div>
             );
           })
@@ -851,12 +878,8 @@ export function ChatCanvas({
             <AgentActivityBanner activities={activities} isStreaming={isStreaming} />
 
             {streamingDelta && (
-              <div className="flex gap-3.5 text-xs leading-relaxed justify-start">
-                <div className="w-7 h-7 rounded-lg bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0 mt-0.5 animate-pulse">
-                  <Bot className="w-4 h-4" />
-                </div>
-
-                <div className="max-w-[85%] rounded-2xl rounded-tl-sm px-4 py-3 bg-surface-elevated border border-surface-border text-slate-200 shadow-md">
+              <div className="flex text-xs leading-relaxed justify-start">
+                <div className="w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1 flex flex-col gap-2.5">
                   <div className="whitespace-pre-wrap font-sans text-xs break-words">
                     {streamingDelta}
                     <span className="inline-block w-1.5 h-3.5 ml-1 bg-blue-400 animate-pulse align-middle" />
@@ -1112,6 +1135,23 @@ export function ChatCanvas({
             </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    {/* Gestor de Archivos Lateral Derecho */}
+        {projectPath && (
+          <FileExplorer
+            workspacePath={projectPath}
+            isOpen={isFileExplorerOpen}
+            onClose={() => {
+              setIsFileExplorerOpen(false);
+              localStorage.setItem('muac_file_explorer_open', 'false');
+            }}
+            onSelectFile={(file) => {
+              setInputText((prev) => `${prev ? prev + ' ' : ''}@${file.relativePath || file.name}`);
+            }}
+          />
+        )}
       </div>
 
       {/* Modal / Lightbox de Vista Previa de Adjuntos (Fotos, Videos, Audios, Archivos) */}

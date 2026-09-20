@@ -76,6 +76,10 @@ export function SettingsModal({
   const [manualTokenInput, setManualTokenInput] = useState('');
   const [isImportingToken, setIsImportingToken] = useState(false);
   const [verifyingAccountId, setVerifyingAccountId] = useState<string | null>(null);
+  const [googleClientId, setGoogleClientId] = useState(settings.googleClientId || '');
+  const [googleClientSecret, setGoogleClientSecret] = useState(settings.googleClientSecret || '');
+  const [isSavingCreds, setIsSavingCreds] = useState(false);
+  const [credsSavedNotice, setCredsSavedNotice] = useState(false);
 
   if (!isOpen) return null;
 
@@ -542,6 +546,86 @@ export function SettingsModal({
                   >
                     {isImportingToken ? 'Importando...' : 'Importar Token'}
                   </button>
+                </div>
+
+                {/* Configuración de Google Client ID y Client Secret */}
+                <div className="p-4 rounded-xl bg-surface-elevated/70 border border-surface-border flex flex-col gap-3 mt-2">
+                  <div className="flex items-center justify-between">
+                    <h5 className="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Credenciales Google Cloud OAuth (Client ID & Client Secret)</span>
+                    </h5>
+                    {credsSavedNotice && (
+                      <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium animate-in fade-in">
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>¡Guardado correctamente!</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-400 leading-relaxed">
+                    Si no deseas editar manualmente el archivo <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">.env</code> o colocar un archivo <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">client_secret_*.json</code> en la raíz, puedes guardar tus claves aquí. Para aplicaciones de escritorio (Desktop App) con PKCE, el Client Secret no es necesario.
+                  </p>
+
+                  <div className="flex flex-col gap-2.5">
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Google Client ID:
+                      </label>
+                      <input
+                        type="text"
+                        value={googleClientId}
+                        onChange={(e) => setGoogleClientId(e.target.value)}
+                        placeholder="ej: xxxxx-xxxxx.apps.googleusercontent.com"
+                        className="w-full px-3 py-1.5 rounded-lg bg-background border border-surface-border text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] text-slate-400 mb-1">
+                        Google Client Secret (Opcional para Desktop App / PKCE):
+                      </label>
+                      <input
+                        type="password"
+                        value={googleClientSecret}
+                        onChange={(e) => setGoogleClientSecret(e.target.value)}
+                        placeholder="ej: GOCSPX-xxxxxxxxxxxxxxxx"
+                        className="w-full px-3 py-1.5 rounded-lg bg-background border border-surface-border text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-between">
+                      <button
+                        type="button"
+                        disabled={isSavingCreds}
+                        onClick={async () => {
+                          setIsSavingCreds(true);
+                          try {
+                            await onUpdateSettings({
+                              googleClientId: googleClientId.trim(),
+                              googleClientSecret: googleClientSecret.trim(),
+                            });
+                            setCredsSavedNotice(true);
+                            setTimeout(() => setCredsSavedNotice(false), 3500);
+                          } finally {
+                            setIsSavingCreds(false);
+                          }
+                        }}
+                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-all shadow-sm"
+                      >
+                        {isSavingCreds ? 'Guardando...' : 'Guardar Credenciales OAuth'}
+                      </button>
+
+                      <a
+                        href="https://console.cloud.google.com/apis/credentials"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[11px] text-blue-400 hover:underline flex items-center gap-1"
+                      >
+                        <span>Consola de Google Cloud</span>
+                        <ExternalLink className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>

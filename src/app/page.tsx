@@ -782,6 +782,7 @@ export default function MuacApp() {
         isSyncing={isSyncingConversations}
         isOpen={isSidebarOpen}
         onToggleSidebar={handleToggleSidebar}
+        currentProjectPath={activeProjectPath}
       />
 
       {/* Canvas Principal de Conversación */}

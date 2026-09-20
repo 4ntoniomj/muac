@@ -22,6 +22,7 @@ import {
   Search,
   ArrowUpDown,
 } from 'lucide-react';
+import { ScheduledTasksModal } from './scheduled-tasks-modal';
 
 export interface ProjectItem {
   id: string;
@@ -47,6 +48,7 @@ interface SidebarProps {
   isSyncing?: boolean;
   isOpen?: boolean;
   onToggleSidebar?: () => void;
+  currentProjectPath?: string;
 }
 
 export function Sidebar({
@@ -64,9 +66,11 @@ export function Sidebar({
   isSyncing = false,
   isOpen = true,
   onToggleSidebar,
+  currentProjectPath,
 }: SidebarProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isSelectMode, setIsSelectMode] = useState(false);
+  const [isTasksModalOpen, setIsTasksModalOpen] = useState(false);
   const [confirmModal, setConfirmModal] = useState<{
     isOpen: boolean;
     ids: string[];
@@ -347,6 +351,16 @@ export function Sidebar({
           : 'w-64 opacity-100 translate-x-0'
       } transition-all duration-300 ease-in-out h-full bg-[#111317] border-r border-[#1e222b] flex flex-col select-none shrink-0 relative font-sans text-xs z-30`}
     >
+      {/* Cabecera de Marca con Logo Oficial */}
+      <div className="px-4 pt-3.5 pb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="w-6 h-6 rounded-lg overflow-hidden flex items-center justify-center bg-surface-elevated/80 border border-white/10 p-0.5">
+            <img src="/logo.png" alt="muac" className="w-full h-full object-contain" />
+          </div>
+          <span className="font-bold text-sm tracking-tight text-white">muac</span>
+        </div>
+      </div>
+
       {/* Cabecera Principal: + Nueva conversación */}
       <div className="p-3 pb-2 flex items-center">
         <button
@@ -415,7 +429,7 @@ export function Sidebar({
 
         <button
           type="button"
-          onClick={() => alert('Tareas programadas: No hay tareas programadas en curso.')}
+          onClick={() => setIsTasksModalOpen(true)}
           className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-[#1a1d24] transition-colors text-xs text-left"
         >
           <Clock className="w-3.5 h-3.5 text-slate-400" />
@@ -757,6 +771,13 @@ export function Sidebar({
           </div>
         </div>
       )}
+
+      {/* Modal de Gestión de Tareas Programadas */}
+      <ScheduledTasksModal
+        isOpen={isTasksModalOpen}
+        onClose={() => setIsTasksModalOpen(false)}
+        currentProjectPath={currentProjectPath}
+      />
     </aside>
   );
 

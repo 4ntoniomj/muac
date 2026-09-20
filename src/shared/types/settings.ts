@@ -21,6 +21,8 @@ export interface GlobalSettings {
   sandboxMode: boolean; // Ejecutar en sandbox (--sandbox)
   defaultProjectPath: string; // Ruta de proyecto local por defecto
   allowedPermissions: AgentToolPermissions; // Permisos individuales seleccionables del agente
+  googleClientId?: string; // Client ID de Google OAuth
+  googleClientSecret?: string; // Client Secret de Google OAuth (opcional para PKCE/desktop)
 }
 
 export const DEFAULT_SETTINGS: GlobalSettings = {

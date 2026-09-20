@@ -126,6 +126,21 @@ function initDatabaseSchema(db: DatabaseSync): void {
       path TEXT NOT NULL UNIQUE,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS scheduled_tasks (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      schedule_type TEXT NOT NULL DEFAULT 'interval',
+      schedule_value TEXT NOT NULL DEFAULT '1h',
+      model_id TEXT NOT NULL DEFAULT 'gemini-3.8-flash-high',
+      project_path TEXT,
+      is_enabled INTEGER NOT NULL DEFAULT 1,
+      last_run_at TEXT,
+      last_status TEXT NOT NULL DEFAULT 'idle',
+      last_result TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
   `);
 
   // Migraciones seguras: asegurar columnas en bases de datos existentes
