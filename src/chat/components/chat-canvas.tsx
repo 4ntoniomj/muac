@@ -15,9 +15,6 @@ import { formatFileSize } from '@/shared/time-utils';
 import type { AgentActivity } from '@/chat/agy-bridge';
 import {
   Send,
-  Sparkles,
-  Bot,
-  User,
   AlertCircle,
   ExternalLink,
   Clock,
@@ -34,20 +31,81 @@ import {
   PanelLeftClose,
   Plus,
   Mic,
-  MicOff,
   Eye,
   Copy,
   Check,
   Volume2,
-  Play,
   ArrowDown,
-  Folder,
   FolderTree,
-  PanelRight,
-  PanelRightClose,
+  Brain,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { FileExplorer } from './file-explorer';
 import { MarkdownRenderer } from './markdown-renderer';
+
+/**
+ * Extrae bloques de pensamiento <thought>...</thought> o <think>...</think>
+ * para representarlos en un acordeón técnico separado de la respuesta final.
+ */
+function extractThinking(rawContent: string): { thinking: string | null; cleanContent: string } {
+  if (!rawContent) return { thinking: null, cleanContent: '' };
+  const match = rawContent.match(/<(?:thought|think)>([\s\S]*?)<\/(?:thought|think)>/i);
+  if (match) {
+    const thinking = match[1].trim();
+    const cleanContent = rawContent.replace(/<(?:thought|think)>[\s\S]*?<\/(?:thought|think)>/gi, '').trim();
+    return { thinking, cleanContent };
+  }
+  return { thinking: null, cleanContent: rawContent };
+}
+
+/**
+ * Acordeón colapsable con diseño de terminal técnica para el razonamiento del modelo.
+ */
+function ThinkingAccordion({
+  thinkingText,
+  thinkingTokens,
+  defaultExpanded = false,
+}: {
+  thinkingText?: string | null;
+  thinkingTokens?: number;
+  defaultExpanded?: boolean;
+}) {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  if (!thinkingText && !thinkingTokens) return null;
+
+  return (
+    <div className="bg-surface/50 border border-surface-border rounded-md font-mono text-[11px] text-slate-400 p-2.5 my-2">
+      <button
+        type="button"
+        onClick={() => setIsExpanded(!isExpanded)}
+        className="w-full flex items-center justify-between text-left hover:text-slate-200 transition-colors select-none"
+      >
+        <div className="flex items-center gap-2">
+          <Brain className="w-3.5 h-3.5 text-accent shrink-0" />
+          <span className="font-semibold text-slate-300 font-sans text-xs">
+            Razonamiento del modelo
+          </span>
+          {thinkingTokens && thinkingTokens > 0 ? (
+            <span className="text-[10px] text-slate-500 font-mono">
+              ({thinkingTokens.toLocaleString()} tokens)
+            </span>
+          ) : null}
+        </div>
+        <div className="p-0.5 text-slate-400 hover:text-white transition-colors">
+          {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+        </div>
+      </button>
+
+      {isExpanded && (
+        <div className="mt-2 pt-2 border-t border-surface-border/60 text-slate-300 whitespace-pre-wrap leading-relaxed max-h-60 overflow-y-auto select-text font-mono text-[10.5px]">
+          {thinkingText || 'El modelo procesó razonamiento analítico interno durante esta generación.'}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface ChatCanvasProps {
   messages: Message[];
@@ -122,6 +180,36 @@ export function ChatCanvas({
       setIsFileExplorerOpen(true);
     }
   }, [projectPath]);
+
+  // Atajos ⌘1 - ⌘4 para el Empty State / Command Palette
+  useEffect(() => {
+    if (messages.length > 0) return;
+
+    const handleKeyDownShortcuts = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.shiftKey && !e.altKey) {
+        if (e.key === '1') {
+          e.preventDefault();
+          setInputText('Explícame cómo funciona la rotación automática de cuentas en muac');
+          textareaRef.current?.focus();
+        } else if (e.key === '2') {
+          e.preventDefault();
+          setInputText('Escribe un script en TypeScript para monitorear límites de API');
+          textareaRef.current?.focus();
+        } else if (e.key === '3') {
+          e.preventDefault();
+          setInputText('Inspecciona el espacio de trabajo y genera un resumen de arquitectura');
+          textareaRef.current?.focus();
+        } else if (e.key === '4') {
+          e.preventDefault();
+          setInputText('Crea un plan de refactorización según la metodología SDD');
+          textareaRef.current?.focus();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDownShortcuts);
+    return () => window.removeEventListener('keydown', handleKeyDownShortcuts);
+  }, [messages.length]);
 
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -554,59 +642,109 @@ export function ChatCanvas({
         }
       }}
     >
-      {/* Barra Superior del Chat con Título y Botón para Mostrar/Ocultar Historial */}
-      <header className="h-11 border-b border-surface-border px-4 flex items-center justify-between bg-sidebar/80 backdrop-blur-sm shrink-0 select-none z-10">
+      {/* 1.A. Barra Superior (Top Navigation & Status Bar) */}
+      <header className="h-12 border-b border-surface-border bg-sidebar/90 backdrop-blur-md px-4 flex items-center justify-between shrink-0 select-none z-10">
+        {/* Lado Izquierdo */}
         <div className="flex items-center gap-2.5 min-w-0">
           {onToggleSidebar && (
             <button
               type="button"
               onClick={onToggleSidebar}
               className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-surface-hover transition-colors border border-transparent hover:border-surface-border"
-              title={isSidebarOpen ? 'Ocultar historial de conversaciones' : 'Mostrar historial de conversaciones'}
+              title={isSidebarOpen ? 'Ocultar barra lateral' : 'Mostrar barra lateral'}
             >
               {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4 text-accent" />}
             </button>
           )}
 
-          <div className="flex items-center gap-2 truncate">
-            <h2 className="text-xs font-semibold text-slate-200 truncate font-sans">
-              {activeConversationTitle || 'Nueva conversación'}
-            </h2>
-            {projectPath && (
-              <span
-                className="bg-surface border border-surface-border text-slate-400 font-mono text-[10px] rounded-md px-2 py-0.5 truncate max-w-[220px]"
-                title={projectPath}
-              >
-                📁 {projectPath.split('/').filter(Boolean).pop() || projectPath}
-              </span>
-            )}
-          </div>
+          <span className="text-slate-600 text-xs select-none">/</span>
+
+          {projectPath ? (
+            <>
+              {onUpdateProjectPath ? (
+                <WorkspaceSelector projectPath={projectPath} onUpdateProjectPath={onUpdateProjectPath} />
+              ) : (
+                <span
+                  className="bg-surface border border-surface-border text-slate-300 font-mono text-[11px] rounded-md px-2 py-0.5 truncate max-w-[200px] flex items-center gap-1.5"
+                  title={projectPath}
+                >
+                  <span>📁</span>
+                  <span className="truncate">{projectPath.split(/[/\\]+/).filter(Boolean).pop() || projectPath}</span>
+                </span>
+              )}
+              <span className="text-slate-600 text-xs select-none">/</span>
+            </>
+          ) : onUpdateProjectPath ? (
+            <>
+              <WorkspaceSelector projectPath="" onUpdateProjectPath={onUpdateProjectPath} />
+              <span className="text-slate-600 text-xs select-none">/</span>
+            </>
+          ) : null}
+
+          <h2
+            className="text-xs font-medium text-slate-200 truncate font-sans max-w-[240px] sm:max-w-sm md:max-w-md"
+            title={activeConversationTitle}
+          >
+            {activeConversationTitle || 'Nueva conversación'}
+          </h2>
         </div>
 
-        <div className="flex items-center gap-2 text-slate-400">
-          <span className="bg-surface border border-surface-border text-slate-400 font-mono text-[10px] rounded-md px-2 py-0.5">
-            {messages.length} {messages.length === 1 ? 'mensaje' : 'mensajes'}
-          </span>
+        {/* Lado Derecho */}
+        <div className="flex items-center gap-2">
+          {/* Selector interactivo de Cuentas Google */}
+          <AccountSelector
+            accounts={accounts}
+            activeAccountId={activeAccountId}
+            onSelectAccount={onSelectAccount}
+            onOpenSettings={onOpenSettings}
+            onRotateNext={onRotateNext}
+            activeModelId={activeModelId}
+            onRefreshQuotas={onRefreshQuotas}
+          />
 
-          {projectPath && (
-            <button
-              type="button"
-              onClick={() => {
-                const next = !isFileExplorerOpen;
-                setIsFileExplorerOpen(next);
-                localStorage.setItem('muac_file_explorer_open', String(next));
-              }}
-              className={`p-1.5 rounded-md transition-colors border flex items-center gap-1.5 text-xs ${
-                isFileExplorerOpen
-                  ? 'bg-surface-active text-amber-300 border-amber-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-surface-hover border-transparent hover:border-surface-border'
-              }`}
-              title={isFileExplorerOpen ? 'Ocultar explorador de archivos' : 'Mostrar explorador de archivos del proyecto'}
-            >
-              <FolderTree className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[11px] font-medium font-sans">Archivos</span>
-            </button>
-          )}
+          {/* Badge de Estado de Rotación */}
+          <button
+            type="button"
+            onClick={() => onOpenSettings('rotacion')}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-[11px] font-mono text-slate-400 hover:text-slate-200 transition-colors cursor-pointer"
+            title="Abrir configuración del pool de rotación"
+          >
+            {accounts.length > 1 ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span>Pool activo: {accounts.length} cuentas</span>
+              </>
+            ) : accounts.length === 1 ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                <span>1 cuenta vinculada</span>
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                <span>Sin cuentas</span>
+              </>
+            )}
+          </button>
+
+          {/* Botón de selector de archivos estilizado y discreto */}
+          <button
+            type="button"
+            onClick={() => {
+              const next = !isFileExplorerOpen;
+              setIsFileExplorerOpen(next);
+              localStorage.setItem('muac_file_explorer_open', String(next));
+            }}
+            className={`px-2.5 py-1 rounded-md transition-colors border flex items-center gap-1.5 text-xs ${
+              isFileExplorerOpen
+                ? 'bg-surface-active text-accent border-accent/40 shadow-sm'
+                : 'bg-surface text-slate-400 hover:text-white hover:bg-surface-hover border-surface-border'
+            }`}
+            title={isFileExplorerOpen ? 'Ocultar explorador de archivos' : 'Mostrar explorador de archivos del proyecto'}
+          >
+            <FolderTree className="w-3.5 h-3.5" />
+            <span className="text-[11px] font-medium font-sans">Archivos</span>
+          </button>
         </div>
       </header>
       {/* Indicador visual de Drag and Drop */}
@@ -674,257 +812,341 @@ export function ChatCanvas({
       <div className="flex-1 min-h-0 flex overflow-hidden">
         {/* Columna del Chat: Mensajes e Input Bar */}
         <div className="flex-1 min-h-0 flex flex-col overflow-hidden relative">
-          {/* Área de Mensajes */}
+          {/* 1.B. Área de Mensajes y Lectura */}
           <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
             <div
               ref={messagesContainerRef}
               onScroll={handleScroll}
-              className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 flex flex-col gap-6 max-w-5xl xl:max-w-6xl w-full mx-auto scroll-smooth"
+              className="flex-1 overflow-y-auto px-4 py-6 flex flex-col gap-6 max-w-4xl w-full mx-auto scroll-smooth"
             >
-        {messages.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 select-none">
-            <div className="w-10 h-10 rounded-xl bg-surface border border-surface-border p-1.5 shadow-sm mb-3 flex items-center justify-center">
-              <img src="/logo.png" alt="muac" className="w-full h-full object-contain" />
-            </div>
-            <h3 className="text-lg font-bold tracking-tight text-white font-sans mb-1">muac · Antigravity Pro</h3>
-            <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed font-sans">
-              Chat con inteligencia artificial, rotación automática de cuentas y soporte de archivos, fotos y videos.
-            </p>
+              {messages.length === 0 ? (
+                /* Empty State: Command Palette / Centro de Trabajo */
+                <div className="flex-1 flex flex-col items-center justify-center text-center p-6 select-none my-auto">
+                  <div className="w-8 h-8 rounded-lg bg-surface border border-surface-border p-1 shadow-sm flex items-center justify-center">
+                    <img src="/logo.png" alt="muac" className="w-full h-full object-contain" />
+                  </div>
+                  <h3 className="text-base font-semibold text-white font-sans mt-2">muac · Antigravity Pro</h3>
+                  <p className="text-xs text-slate-400 max-w-sm text-center mb-6 font-sans">
+                    Asistente de desarrollo agéntico con rotación automática de cuotas y ejecución contextual.
+                  </p>
 
-            <div className="grid grid-cols-2 gap-3 max-w-lg w-full text-left">
-              <button
-                type="button"
-                onClick={() => setInputText('Explícame cómo funciona la rotación automática de cuentas en muac')}
-                className="bg-surface hover:bg-surface-hover border border-surface-border rounded-lg p-3 text-xs transition-colors text-left"
-              >
-                <div className="font-semibold text-accent mb-1 font-sans">Rotación automática</div>
-                <div className="text-[11px] text-slate-400 font-sans">¿Cómo conmuta entre cuentas de 5h?</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setInputText('Escribe un script en TypeScript para monitorear límites de API')}
-                className="bg-surface hover:bg-surface-hover border border-surface-border rounded-lg p-3 text-xs transition-colors text-left"
-              >
-                <div className="font-semibold text-emerald-400 mb-1 font-sans">Código técnico</div>
-                <div className="text-[11px] text-slate-400 font-sans">Script de TypeScript para monitoreo</div>
-              </button>
-            </div>
-          </div>
-        ) : (
-          messages.map((msg) => {
-            const isUser = msg.role === 'user';
-            const linesCount = msg.content ? msg.content.split('\n').length : 0;
-            const isLongResponse = linesCount > 35;
-
-            return (
-              <div
-                key={msg.id}
-                className={`flex text-xs leading-relaxed ${
-                  isUser ? 'justify-end' : 'justify-start'
-                }`}
-              >
-                <div
-                  className={`flex flex-col gap-2.5 transition-colors ${
-                    isUser
-                      ? 'max-w-[85%] rounded-lg px-3.5 py-2.5 shadow-sm bg-surface-elevated border border-surface-border text-slate-200'
-                      : 'w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1 leading-relaxed font-sans'
-                  }`}
-                >
-                  {/* Adjuntos del Mensaje (Fotos, Videos, Audios, Archivos) */}
-                  {msg.attachments && msg.attachments.length > 0 && (
-                    <div className="flex flex-col gap-2 pt-0.5">
-                      {msg.attachments.map((att) => (
-                        <div key={att.id} className="rounded-lg overflow-hidden">
-                          {att.type === 'image' ? (
-                            <div className="relative group cursor-pointer" onClick={() => setPreviewAttachment(att)}>
-                              <img
-                                src={att.url}
-                                alt={att.name}
-                                className="max-h-72 max-w-full rounded-lg object-contain bg-black/40 border border-surface-border hover:opacity-95 transition-opacity"
-                              />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2 text-white text-xs font-medium">
-                                <Eye className="w-4 h-4" />
-                                <span>Ver imagen completa</span>
-                              </div>
-                            </div>
-                          ) : att.type === 'video' ? (
-                            <div className="relative">
-                              <video
-                                src={att.url}
-                                controls
-                                className="max-h-72 max-w-full rounded-lg bg-black border border-surface-border"
-                              />
-                            </div>
-                          ) : att.type === 'audio' ? (
-                            <div
-                              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
-                                isUser
-                                  ? 'bg-black/30 border-surface-border text-slate-200'
-                                  : 'bg-surface-elevated border-surface-border text-slate-200'
-                              }`}
-                            >
-                              <div className="w-8 h-8 rounded-md bg-accent/20 flex items-center justify-center text-blue-300 shrink-0">
-                                <Volume2 className="w-4 h-4" />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="text-xs font-semibold truncate font-sans">{att.name}</div>
-                                <div className="text-[10px] text-slate-400 font-mono">
-                                  {formatFileSize(att.size)} • Nota de voz
-                                </div>
-                                <audio controls src={att.url} className="w-full h-8 mt-1.5 accent-blue-500" />
-                              </div>
-                            </div>
-                          ) : (
-                            <div
-                              className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border transition-colors ${
-                                isUser
-                                  ? 'bg-black/30 border-surface-border text-slate-200'
-                                  : 'bg-surface-elevated border-surface-border text-slate-200'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-8 h-8 rounded-md bg-accent/20 flex items-center justify-center text-blue-300 shrink-0">
-                                  <FileText className="w-4 h-4" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-semibold truncate font-sans">{att.name}</div>
-                                  <div className="text-[10px] text-slate-400 font-mono">
-                                    {att.lineCount ? `${att.lineCount} líneas • ` : ''}
-                                    {formatFileSize(att.size)}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex items-center gap-1 shrink-0">
-                                <button
-                                  type="button"
-                                  onClick={() => setPreviewAttachment(att)}
-                                  className="p-1.5 rounded-md hover:bg-surface-hover text-slate-300 hover:text-white transition-colors"
-                                  title="Previsualizar contenido"
-                                >
-                                  <Eye className="w-3.5 h-3.5" />
-                                </button>
-                                <a
-                                  href={att.url}
-                                  download={att.name}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-1.5 rounded-md hover:bg-surface-hover text-slate-300 hover:text-white transition-colors"
-                                  title="Descargar archivo"
-                                >
-                                  <Download className="w-3.5 h-3.5" />
-                                </a>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Contenido de Texto */}
-                  {msg.content && (
-                    isUser ? (
-                      <div className="whitespace-pre-wrap font-sans text-xs break-words leading-relaxed">
-                        {renderMessageContentWithMedia(msg.content)}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-w-lg w-full text-left">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputText('Explícame cómo funciona la rotación automática de cuentas en muac');
+                        textareaRef.current?.focus();
+                      }}
+                      className="group flex items-start justify-between p-3 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border hover:border-surface-border/80 transition-all text-left shadow-sm cursor-pointer"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors font-sans">
+                          Rotación automática
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-sans">
+                          ¿Cómo conmuta entre cuentas de 5h y semanales?
+                        </span>
                       </div>
-                    ) : (
-                      <div className="font-sans text-xs break-words leading-relaxed">
-                        <MarkdownRenderer
-                          content={msg.content}
-                          onPreviewImage={(src, alt) =>
-                            setPreviewAttachment({
-                              id: `inline_${Date.now()}`,
-                              name: alt || 'imagen.png',
-                              type: 'image',
-                              url: src,
-                              size: 0,
-                              mimeType: 'image/png',
-                            })
-                          }
-                        />
+                      <kbd className="text-[10px] font-mono text-slate-500 bg-surface-elevated px-1.5 py-0.5 rounded border border-surface-border/60 shrink-0 ml-2">
+                        ⌘1
+                      </kbd>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputText('Escribe un script en TypeScript para monitorear límites de API');
+                        textareaRef.current?.focus();
+                      }}
+                      className="group flex items-start justify-between p-3 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border hover:border-surface-border/80 transition-all text-left shadow-sm cursor-pointer"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors font-sans">
+                          Código técnico
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-sans">
+                          Script de TypeScript para monitorear cuotas de agy
+                        </span>
                       </div>
-                    )
-                  )}
+                      <kbd className="text-[10px] font-mono text-slate-500 bg-surface-elevated px-1.5 py-0.5 rounded border border-surface-border/60 shrink-0 ml-2">
+                        ⌘2
+                      </kbd>
+                    </button>
 
-                  {/* Si el mensaje del asistente es muy extenso (> 35 líneas), botón para descargarlo como archivo */}
-                  {!isUser && isLongResponse && (
-                    <div className="flex items-center justify-end pt-1">
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadTextAsFile(msg.content, `respuesta_${msg.id.slice(-6)}.txt`)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-surface-border hover:bg-surface-hover text-slate-300 hover:text-white font-mono text-[10px] transition-colors"
-                        title="Descargar esta respuesta como archivo de texto"
-                      >
-                        <FileCode className="w-3 h-3 text-accent" />
-                        <span>Descargar como archivo ({linesCount} líneas)</span>
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Metadatos del mensaje */}
-                  {!isUser && msg.usage && (
-                    <div className="mt-1 pt-2 border-t border-surface-border flex items-center gap-3 font-mono text-[10px] text-slate-500">
-                      {msg.durationSeconds !== undefined && (
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-slate-500" />
-                          <span>{msg.durationSeconds.toFixed(1)}s</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputText('Inspecciona el espacio de trabajo y genera un resumen de arquitectura');
+                        textareaRef.current?.focus();
+                      }}
+                      className="group flex items-start justify-between p-3 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border hover:border-surface-border/80 transition-all text-left shadow-sm cursor-pointer"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors font-sans">
+                          Explorar Workspace
                         </span>
-                      )}
-                      {msg.usage.totalTokens > 0 && (
-                        <span>
-                          {msg.usage.totalTokens.toLocaleString()} tokens (
-                          {msg.usage.inputTokens.toLocaleString()} entrada /{' '}
-                          {msg.usage.outputTokens.toLocaleString()} salida)
+                        <span className="text-[11px] text-slate-400 font-sans">
+                          Estructura de dominios y contratos compartidos
                         </span>
-                      )}
-                      {msg.accountEmail && (
-                        <span className="text-slate-500 truncate max-w-[140px]">
-                          {msg.accountEmail}
+                      </div>
+                      <kbd className="text-[10px] font-mono text-slate-500 bg-surface-elevated px-1.5 py-0.5 rounded border border-surface-border/60 shrink-0 ml-2">
+                        ⌘3
+                      </kbd>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setInputText('Crea un plan de refactorización según la metodología SDD');
+                        textareaRef.current?.focus();
+                      }}
+                      className="group flex items-start justify-between p-3 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border hover:border-surface-border/80 transition-all text-left shadow-sm cursor-pointer"
+                    >
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-medium text-slate-200 group-hover:text-white transition-colors font-sans">
+                          Planificación SDD
                         </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            );
-          })
-        )}
-
-        {/* Mensaje en Streaming y Observabilidad */}
-        {isStreaming && (
-          <div className="flex flex-col gap-2">
-            <AgentActivityBanner activities={activities} isStreaming={isStreaming} />
-
-            {streamingDelta && (
-              <div className="flex text-xs leading-relaxed justify-start">
-                <div className="w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1 flex flex-col gap-2.5">
-                  <div className="font-sans text-xs break-words">
-                    <MarkdownRenderer
-                      content={streamingDelta}
-                      isStreaming={true}
-                      onPreviewImage={(src, alt) =>
-                        setPreviewAttachment({
-                          id: `inline_${Date.now()}`,
-                          name: alt || 'imagen.png',
-                          type: 'image',
-                          url: src,
-                          size: 0,
-                          mimeType: 'image/png',
-                        })
-                      }
-                    />
-                    <span className="inline-block w-1.5 h-3.5 ml-1 bg-blue-400 animate-pulse align-middle" />
+                        <span className="text-[11px] text-slate-400 font-sans">
+                          Especificar fases, subagentes y testing
+                        </span>
+                      </div>
+                      <kbd className="text-[10px] font-mono text-slate-500 bg-surface-elevated px-1.5 py-0.5 rounded border border-surface-border/60 shrink-0 ml-2">
+                        ⌘4
+                      </kbd>
+                    </button>
                   </div>
                 </div>
-              </div>
-            )}
-          </div>
-        )}
+              ) : (
+                messages.map((msg) => {
+                  const isUser = msg.role === 'user';
+                  const linesCount = msg.content ? msg.content.split('\n').length : 0;
+                  const isLongResponse = linesCount > 35;
+                  const { thinking, cleanContent } = extractThinking(msg.content);
 
-        <div ref={messagesEndRef} />
-        </div>
-      </div>
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex text-xs leading-relaxed ${
+                        isUser ? 'justify-end' : 'justify-start'
+                      }`}
+                    >
+                      <div
+                        className={`flex flex-col gap-2.5 transition-colors ${
+                          isUser
+                            ? 'max-w-[80%] rounded-lg px-4 py-2.5 bg-surface-elevated border border-surface-border text-slate-200 shadow-sm leading-relaxed'
+                            : 'w-full bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1 leading-relaxed font-sans'
+                        }`}
+                      >
+                        {/* Adjuntos del Mensaje */}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-col gap-2 pt-0.5">
+                            {msg.attachments.map((att) => (
+                              <div key={att.id} className="rounded-lg overflow-hidden">
+                                {att.type === 'image' ? (
+                                  <div className="relative group cursor-pointer" onClick={() => setPreviewAttachment(att)}>
+                                    <img
+                                      src={att.url}
+                                      alt={att.name}
+                                      className="max-h-72 max-w-full rounded-lg object-contain bg-black/40 border border-surface-border hover:opacity-95 transition-opacity"
+                                    />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2 text-white text-xs font-medium">
+                                      <Eye className="w-4 h-4" />
+                                      <span>Ver imagen completa</span>
+                                    </div>
+                                  </div>
+                                ) : att.type === 'video' ? (
+                                  <div className="relative">
+                                    <video
+                                      src={att.url}
+                                      controls
+                                      className="max-h-72 max-w-full rounded-lg bg-black border border-surface-border"
+                                    />
+                                  </div>
+                                ) : att.type === 'audio' ? (
+                                  <div
+                                    className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
+                                      isUser
+                                        ? 'bg-black/30 border-surface-border text-slate-200'
+                                        : 'bg-surface-elevated border-surface-border text-slate-200'
+                                    }`}
+                                  >
+                                    <div className="w-8 h-8 rounded-md bg-accent/20 flex items-center justify-center text-blue-300 shrink-0">
+                                      <Volume2 className="w-4 h-4" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                      <div className="text-xs font-semibold truncate font-sans">{att.name}</div>
+                                      <div className="text-[10px] text-slate-400 font-mono">
+                                        {formatFileSize(att.size)} • Nota de voz
+                                      </div>
+                                      <audio controls src={att.url} className="w-full h-8 mt-1.5 accent-blue-500" />
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div
+                                    className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border transition-colors ${
+                                      isUser
+                                        ? 'bg-black/30 border-surface-border text-slate-200'
+                                        : 'bg-surface-elevated border-surface-border text-slate-200'
+                                    }`}
+                                  >
+                                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                                      <div className="w-8 h-8 rounded-md bg-accent/20 flex items-center justify-center text-blue-300 shrink-0">
+                                        <FileText className="w-4 h-4" />
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <div className="text-xs font-semibold truncate font-sans">{att.name}</div>
+                                        <div className="text-[10px] text-slate-400 font-mono">
+                                          {att.lineCount ? `${att.lineCount} líneas • ` : ''}
+                                          {formatFileSize(att.size)}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <button
+                                        type="button"
+                                        onClick={() => setPreviewAttachment(att)}
+                                        className="p-1.5 rounded-md hover:bg-surface-hover text-slate-300 hover:text-white transition-colors"
+                                        title="Previsualizar contenido"
+                                      >
+                                        <Eye className="w-3.5 h-3.5" />
+                                      </button>
+                                      <a
+                                        href={att.url}
+                                        download={att.name}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="p-1.5 rounded-md hover:bg-surface-hover text-slate-300 hover:text-white transition-colors"
+                                        title="Descargar archivo"
+                                      >
+                                        <Download className="w-3.5 h-3.5" />
+                                      </a>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Bloque de Pensamiento / Razonamiento (Thinking) */}
+                        {!isUser && (thinking || (msg.usage?.thinkingTokens && msg.usage.thinkingTokens > 0)) && (
+                          <ThinkingAccordion
+                            thinkingText={thinking}
+                            thinkingTokens={msg.usage?.thinkingTokens}
+                          />
+                        )}
+
+                        {/* Contenido de Texto */}
+                        {isUser ? (
+                          msg.content && (
+                            <div className="whitespace-pre-wrap font-sans text-xs break-words leading-relaxed">
+                              {renderMessageContentWithMedia(msg.content)}
+                            </div>
+                          )
+                        ) : (
+                          cleanContent && (
+                            <div className="font-sans text-xs break-words leading-relaxed">
+                              <MarkdownRenderer
+                                content={cleanContent}
+                                onPreviewImage={(src, alt) =>
+                                  setPreviewAttachment({
+                                    id: `inline_${Date.now()}`,
+                                    name: alt || 'imagen.png',
+                                    type: 'image',
+                                    url: src,
+                                    size: 0,
+                                    mimeType: 'image/png',
+                                  })
+                                }
+                              />
+                            </div>
+                          )
+                        )}
+
+                        {/* Si la respuesta del asistente es extensa (> 35 líneas), botón para descargarla */}
+                        {!isUser && isLongResponse && (
+                          <div className="flex items-center justify-end pt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDownloadTextAsFile(msg.content, `respuesta_${msg.id.slice(-6)}.txt`)}
+                              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-surface-border hover:bg-surface-hover text-slate-300 hover:text-white font-mono text-[10px] transition-colors"
+                              title="Descargar esta respuesta como archivo de texto"
+                            >
+                              <FileCode className="w-3 h-3 text-accent" />
+                              <span>Descargar como archivo ({linesCount} líneas)</span>
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Metadatos del mensaje */}
+                        {!isUser && msg.usage && (
+                          <div className="mt-1 pt-2 border-t border-surface-border flex items-center gap-3 font-mono text-[10px] text-slate-500">
+                            {msg.durationSeconds !== undefined && (
+                              <span className="flex items-center gap-1">
+                                <Clock className="w-3 h-3 text-slate-500" />
+                                <span>{msg.durationSeconds.toFixed(1)}s</span>
+                              </span>
+                            )}
+                            {msg.usage.totalTokens > 0 && (
+                              <span>
+                                {msg.usage.totalTokens.toLocaleString()} tokens (
+                                {msg.usage.inputTokens.toLocaleString()} entrada /{' '}
+                                {msg.usage.outputTokens.toLocaleString()} salida)
+                              </span>
+                            )}
+                            {msg.accountEmail && (
+                              <span className="text-slate-500 truncate max-w-[140px]">
+                                {msg.accountEmail}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+
+              {/* Mensaje en Streaming y Observabilidad */}
+              {isStreaming && (
+                <div className="flex flex-col gap-2">
+                  <AgentActivityBanner activities={activities} isStreaming={isStreaming} />
+
+                  {streamingDelta && (() => {
+                    const { thinking: stThinking, cleanContent: stClean } = extractThinking(streamingDelta);
+                    return (
+                      <div className="flex text-xs leading-relaxed justify-start">
+                        <div className="w-full bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1 flex flex-col gap-2.5 font-sans">
+                          {stThinking && (
+                            <ThinkingAccordion thinkingText={stThinking} defaultExpanded={true} />
+                          )}
+                          <div className="font-sans text-xs break-words">
+                            <MarkdownRenderer
+                              content={stClean}
+                              isStreaming={true}
+                              onPreviewImage={(src, alt) =>
+                                setPreviewAttachment({
+                                  id: `inline_${Date.now()}`,
+                                  name: alt || 'imagen.png',
+                                  type: 'image',
+                                  url: src,
+                                  size: 0,
+                                  mimeType: 'image/png',
+                                })
+                              }
+                            />
+                            <span className="inline-block w-1.5 h-3.5 ml-1 bg-accent animate-pulse align-middle" />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+
+              <div ref={messagesEndRef} />
+            </div>
+          </div>
 
       {/* Barra Inferior de Entrada (Input Bar) */}
       <div className="p-4 border-t border-surface-border bg-sidebar/80 backdrop-blur-sm relative">
@@ -948,40 +1170,8 @@ export function ChatCanvas({
           </div>
         )}
 
-        <div className="max-w-5xl xl:max-w-6xl w-full mx-auto flex flex-col gap-2">
-          {/* Controles Superiores: Desplegables de Modelos, Esfuerzo, Cuentas, Workspace y Aro de Contexto */}
-          <div className="flex items-center justify-between px-1 gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <ModelSelector selectedModelId={activeModelId} onSelectModel={onSelectModel} />
-              <ReasoningSlider
-                modelId={activeModelId}
-                effort={activeReasoningEffort}
-                onChangeEffort={onSelectReasoningEffort}
-              />
-              <AccountSelector
-                accounts={accounts}
-                activeAccountId={activeAccountId}
-                onSelectAccount={onSelectAccount}
-                onOpenSettings={onOpenSettings}
-                onRotateNext={onRotateNext}
-                activeModelId={activeModelId}
-                onRefreshQuotas={onRefreshQuotas}
-              />
-              {onUpdateProjectPath && (
-                <WorkspaceSelector
-                  projectPath={projectPath}
-                  onUpdateProjectPath={onUpdateProjectPath}
-                />
-              )}
-            </div>
-
-            {/* Aro de Ventana de Contexto (Posición Original) */}
-            <div className="flex items-center gap-2 shrink-0">
-              <ContextRing usage={contextUsage} modelName={activeModel.name} />
-            </div>
-          </div>
-
-          {/* Selector oculto de archivos nativo */}
+        {/* 1.C. Composer (Input Bar) - Estilo Raycast / Cursor (Caja Contenedora Unificada) */}
+        <div className="max-w-4xl w-full mx-auto rounded-xl bg-surface border border-surface-border focus-within:border-accent shadow-lg transition-all p-2.5 flex flex-col gap-2">
           <input
             type="file"
             ref={fileInputRef}
@@ -993,133 +1183,135 @@ export function ChatCanvas({
             accept="image/*,video/*,.pdf,.txt,.md,.json,.ts,.js,.py,.zip,*"
           />
 
-          {/* Contenedor de Redacción con Chips de Adjuntos */}
-          <div className="bg-surface border border-surface-border focus-within:border-accent/70 rounded-xl p-2 shadow-sm transition-colors flex flex-col gap-2">
-            {/* Previsualizaciones de Adjuntos Pendientes */}
-            {pendingAttachments.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap px-1 pt-1 border-b border-surface-border pb-2">
-                {pendingAttachments.map((att) => (
-                  <div
-                    key={att.id}
-                    className="bg-surface-elevated border border-surface-border rounded-md p-1.5 text-xs group relative flex items-center gap-2 shadow-sm transition-colors animate-in fade-in"
-                  >
-                    {att.type === 'image' ? (
-                      <div
-                        className="relative w-8 h-8 rounded-md overflow-hidden bg-black/40 border border-surface-border shrink-0 cursor-pointer group-hover:border-accent/50 transition-colors"
-                        onClick={() => setPreviewAttachment(att)}
-                        title="Clic para previsualizar imagen en grande"
-                      >
-                        <img
-                          src={att.url}
-                          alt={att.name}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <Eye className="w-3 h-3 text-white" />
-                        </div>
-                      </div>
-                    ) : att.type === 'video' ? (
-                      <div
-                        className="relative w-8 h-8 rounded-md overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center cursor-pointer group-hover:border-purple-500/60 transition-colors"
-                        onClick={() => setPreviewAttachment(att)}
-                        title="Clic para previsualizar video"
-                      >
-                        <Film className="w-3.5 h-3.5 text-purple-400" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <Play className="w-2.5 h-2.5 text-white fill-white" />
-                        </div>
-                      </div>
-                    ) : att.type === 'audio' ? (
-                      <div
-                        className="w-8 h-8 rounded-md bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 cursor-pointer group-hover:border-amber-500/60 transition-colors"
-                        onClick={() => setPreviewAttachment(att)}
-                        title="Clic para escuchar audio"
-                      >
-                        <Volume2 className="w-3.5 h-3.5" />
-                      </div>
-                    ) : (
-                      <div
-                        className="w-8 h-8 rounded-md bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 cursor-pointer group-hover:border-emerald-500/60 transition-colors"
-                        onClick={() => setPreviewAttachment(att)}
-                        title="Clic para ver contenido del archivo"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                      </div>
-                    )}
+          {/* Zona Superior: Textarea transparente, sin bordes propios, expandible */}
+          <textarea
+            ref={textareaRef}
+            rows={1}
+            value={inputText}
+            onChange={(e) => handleTextChange(e.target.value)}
+            onPaste={handlePaste}
+            onKeyDown={handleKeyDown}
+            disabled={isStreaming}
+            placeholder="Envía un mensaje, consulta técnica o adjunta archivos... (Enter para enviar)"
+            className="resize-none min-h-[44px] max-h-48 text-xs text-slate-200 placeholder:text-slate-500 font-sans leading-relaxed focus:outline-none w-full bg-transparent px-1 py-1"
+          />
 
-                    <div className="flex flex-col min-w-0 max-w-[140px]">
-                      <span className="text-[11px] font-medium text-slate-200 truncate font-sans">{att.name}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">
-                        {att.lineCount ? `${att.lineCount} lín • ` : ''}
-                        {formatFileSize(att.size)}
-                      </span>
+          {/* Zona Media: Previsualizaciones de Adjuntos Pendientes */}
+          {pendingAttachments.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap px-1 pt-1 border-t border-surface-border/50 pb-1">
+              {pendingAttachments.map((att) => (
+                <div
+                  key={att.id}
+                  className="bg-surface-elevated border border-surface-border rounded-md p-1.5 text-xs group relative flex items-center gap-2 shadow-sm transition-colors animate-in fade-in"
+                >
+                  {att.type === 'image' ? (
+                    <div
+                      className="relative w-7 h-7 rounded overflow-hidden bg-black/40 border border-surface-border shrink-0 cursor-pointer group-hover:border-accent/50 transition-colors"
+                      onClick={() => setPreviewAttachment(att)}
+                      title="Clic para previsualizar imagen"
+                    >
+                      <img
+                        src={att.url}
+                        alt={att.name}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                      />
+                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                        <Eye className="w-3 h-3 text-white" />
+                      </div>
                     </div>
+                  ) : att.type === 'video' ? (
+                    <div
+                      className="relative w-7 h-7 rounded overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center cursor-pointer group-hover:border-purple-500/60 transition-colors"
+                      onClick={() => setPreviewAttachment(att)}
+                      title="Clic para previsualizar video"
+                    >
+                      <Film className="w-3 h-3 text-purple-400" />
+                    </div>
+                  ) : att.type === 'audio' ? (
+                    <div
+                      className="w-7 h-7 rounded bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 cursor-pointer group-hover:border-amber-500/60 transition-colors"
+                      onClick={() => setPreviewAttachment(att)}
+                      title="Clic para escuchar audio"
+                    >
+                      <Volume2 className="w-3 h-3" />
+                    </div>
+                  ) : (
+                    <div
+                      className="w-7 h-7 rounded bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 cursor-pointer group-hover:border-emerald-500/60 transition-colors"
+                      onClick={() => setPreviewAttachment(att)}
+                      title="Clic para ver contenido del archivo"
+                    >
+                      <FileText className="w-3 h-3" />
+                    </div>
+                  )}
 
-                    <div className="flex items-center gap-0.5 ml-1">
-                      <button
-                        type="button"
-                        onClick={() => setPreviewAttachment(att)}
-                        className="p-1 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
-                        title="Previsualizar"
-                      >
-                        <Eye className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveAttachment(att.id)}
-                        className="p-1 rounded-md hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
-                        title="Quitar"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
+                  <div className="flex flex-col min-w-0 max-w-[130px]">
+                    <span className="text-[11px] font-medium text-slate-200 truncate font-sans">{att.name}</span>
+                    <span className="text-[9px] text-slate-400 font-mono">
+                      {att.lineCount ? `${att.lineCount} lín • ` : ''}
+                      {formatFileSize(att.size)}
+                    </span>
                   </div>
-                ))}
-              </div>
-            )}
 
-            <div className="relative flex items-end gap-2">
-              {/* Botón de Adjuntar Fotos, Videos o Archivos (+) */}
+                  <div className="flex items-center gap-0.5 ml-1">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewAttachment(att)}
+                      className="p-1 rounded hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
+                      title="Previsualizar"
+                    >
+                      <Eye className="w-3 h-3" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveAttachment(att.id)}
+                      className="p-1 rounded hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                      title="Quitar"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Zona Inferior: Toolbar integrada dentro del composer */}
+          <div className="flex items-center justify-between pt-1.5 border-t border-surface-border/50">
+            {/* A la izquierda */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <ModelSelector selectedModelId={activeModelId} onSelectModel={onSelectModel} />
+              <ReasoningSlider
+                modelId={activeModelId}
+                effort={activeReasoningEffort}
+                onChangeEffort={onSelectReasoningEffort}
+              />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isStreaming || isUploading}
-                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-surface-hover transition-colors shrink-0"
-                title="Adjuntar fotos, videos o archivos (también puedes arrastrarlos o pegar capturas)"
+                className="p-1.5 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors shrink-0"
+                title="Adjuntar fotos, videos o archivos"
               >
                 {isUploading ? (
-                  <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                 ) : (
-                  <Plus className="w-4 h-4" />
+                  <Paperclip className="w-3.5 h-3.5" />
                 )}
               </button>
-
-              <textarea
-                ref={textareaRef}
-                rows={1}
-                value={inputText}
-                onChange={(e) => handleTextChange(e.target.value)}
-                onPaste={handlePaste}
-                onKeyDown={handleKeyDown}
-                disabled={isStreaming}
-                placeholder="Envía un mensaje, foto, video o archivo... (textos de >35 líneas se pasan como archivo)"
-                className="flex-1 bg-transparent text-slate-200 text-xs px-1 py-1.5 focus:outline-none resize-none max-h-44 placeholder:text-slate-500 leading-relaxed font-sans"
-              />
-
-              {/* Botón de Micrófono para Dictar Prompt (a la izquierda del botón de enviar) */}
               <button
                 type="button"
                 onClick={handleToggleRecording}
                 disabled={isStreaming}
-                className={`p-2 rounded-lg transition-colors shrink-0 flex items-center justify-center gap-1.5 ${
+                className={`p-1.5 rounded-md transition-colors shrink-0 flex items-center justify-center gap-1 ${
                   isRecording
                     ? 'bg-rose-950/90 border border-rose-500/60 text-rose-300 shadow-sm hover:bg-rose-900/90'
-                    : 'text-slate-400 hover:text-white hover:bg-surface-hover'
+                    : 'hover:bg-surface-hover text-slate-400 hover:text-white'
                 }`}
                 title={
                   isRecording
-                    ? 'Grabando voz sin límite... Haz clic para detener'
-                    : 'Dictar mensaje con el micrófono (sin límite de tiempo)'
+                    ? 'Grabando voz... Haz clic para detener'
+                    : 'Dictar mensaje con el micrófono'
                 }
               >
                 {isRecording ? (
@@ -1128,38 +1320,47 @@ export function ChatCanvas({
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75" />
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
                     </span>
-                    <Mic className="w-4 h-4 text-rose-400 animate-pulse" />
+                    <Mic className="w-3.5 h-3.5 text-rose-400 animate-pulse" />
                   </>
                 ) : (
-                  <Mic className="w-4 h-4" />
+                  <Mic className="w-3.5 h-3.5" />
                 )}
               </button>
+            </div>
+
+            {/* A la derecha */}
+            <div className="flex items-center gap-2 shrink-0">
+              <ContextRing usage={contextUsage} modelName={activeModel.name} />
 
               {isStreaming ? (
                 <button
                   type="button"
                   onClick={onStopStreaming}
-                  className="p-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+                  className="px-3 py-1.5 rounded-md bg-rose-600 hover:bg-rose-500 text-white text-xs font-medium flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
                   title="Detener respuesta"
                 >
-                  <Square className="w-4 h-4 fill-current" />
+                  <Square className="w-3 h-3 fill-current" />
+                  <span>Detener</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={handleSubmit}
                   disabled={(!inputText.trim() && pendingAttachments.length === 0) || isUploading}
-                  className={`p-2 rounded-lg font-medium shadow-sm transition-colors shrink-0 ${
+                  className={`px-3 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 shadow-sm transition-colors ${
                     (inputText.trim() || pendingAttachments.length > 0) && !isUploading
                       ? 'bg-accent hover:bg-accent-hover text-white cursor-pointer'
-                      : 'bg-surface-hover text-slate-500 cursor-not-allowed opacity-60'
+                      : 'bg-surface-elevated text-slate-500 cursor-not-allowed border border-surface-border/50'
                   }`}
-                  title="Enviar mensaje"
+                  title="Enviar mensaje (Enter)"
                 >
                   {isUploading ? (
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
-                    <Send className="w-4 h-4" />
+                    <>
+                      <span>Enviar</span>
+                      <kbd className="text-[10px] font-mono opacity-70">↵</kbd>
+                    </>
                   )}
                 </button>
               )}

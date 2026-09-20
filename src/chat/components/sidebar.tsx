@@ -2,7 +2,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import type { Conversation } from '@/shared/types/chat';
+import type { AccountWithQuota } from '@/shared/types/account';
 import { formatRelativeTime } from '@/shared/time-utils';
+import { formatTimeUntilReset } from '@/shared/quota-utils';
 import {
   Plus,
   Trash2,
@@ -83,6 +85,7 @@ export function Sidebar({
   const [searchQuery, setSearchQuery] = useState('');
   const [projectSortBy, setProjectSortBy] = useState<'recent' | 'name-asc' | 'name-desc' | 'convos-count'>('recent');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
+  const [sidebarAccounts, setSidebarAccounts] = useState<AccountWithQuota[]>([]);
 
   // Cargar proyectos registrados desde la API
   useEffect(() => {
@@ -99,6 +102,51 @@ export function Sidebar({
     }
     fetchProjects();
   }, [conversations.length]);
+
+  // Cargar información de cuentas y cuotas para el widget
+  useEffect(() => {
+    async function fetchAccounts() {
+      try {
+        const res = await fetch('/api/accounts');
+        const data = await res.json();
+        if (data.success && data.accounts) {
+          setSidebarAccounts(data.accounts);
+        }
+      } catch (err) {
+        console.error('Error al cargar cuentas en sidebar:', err);
+      }
+    }
+    fetchAccounts();
+  }, [activeAccountEmail]);
+
+  // Cuenta activa y cálculo de cuotas
+  const currentAccount = useMemo(() => {
+    if (!sidebarAccounts || sidebarAccounts.length === 0) return null;
+    if (activeAccountEmail) {
+      return (
+        sidebarAccounts.find((a) => a.email.toLowerCase() === activeAccountEmail.toLowerCase()) ||
+        sidebarAccounts[0]
+      );
+    }
+    return sidebarAccounts.find((a) => a.isActive) || sidebarAccounts[0];
+  }, [sidebarAccounts, activeAccountEmail]);
+
+  const quotaSummary = currentAccount?.quota;
+  const quota5hFrac = quotaSummary
+    ? (quotaSummary.gemini5hRemaining ?? quotaSummary.thirdParty5hRemaining)
+    : null;
+  const quotaWeeklyFrac = quotaSummary
+    ? (quotaSummary.geminiWeeklyRemaining ?? quotaSummary.thirdPartyWeeklyRemaining)
+    : null;
+
+  const quota5hPct = quota5hFrac !== null && quota5hFrac !== undefined ? Math.round(quota5hFrac * 100) : null;
+  const quotaWeeklyPct = quotaWeeklyFrac !== null && quotaWeeklyFrac !== undefined ? Math.round(quotaWeeklyFrac * 100) : null;
+
+  const reset5hIso = quotaSummary?.gemini5hReset || quotaSummary?.thirdParty5hReset;
+  const resetWeeklyIso = quotaSummary?.geminiWeeklyReset || quotaSummary?.thirdPartyWeeklyReset;
+
+  const reset5hText = formatTimeUntilReset(reset5hIso);
+  const resetWeeklyText = formatTimeUntilReset(resetWeeklyIso);
 
   const allSelected = conversations.length > 0 && selectedIds.size === conversations.length;
 
@@ -369,7 +417,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => onNewConversation()}
-          className="w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border text-slate-200 hover:text-white text-xs font-medium transition-colors group active:scale-[0.99]"
+          className="w-full flex items-center justify-between px-3 py-2 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-200 hover:text-white text-xs font-medium transition-colors group active:scale-[0.99]"
         >
           <div className="flex items-center gap-2">
             <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
@@ -702,17 +750,93 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Pie del Sidebar: Cuenta activa y Botón Settings */}
+      {/* Pie del Sidebar: Widget de Cuenta y Cuotas + Acceso directo a Configuración y Tareas */}
       <div className="p-2.5 border-t border-surface-border bg-sidebar flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          {activeAccountEmail ? (
-            <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-surface border border-surface-border text-slate-300 font-mono text-[11px] min-w-0 flex-1 mr-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
-              <span className="truncate">{activeAccountEmail}</span>
+        {/* Widget de Cuenta y Cuotas en el Sidebar */}
+        <div className="p-2.5 rounded-lg bg-surface border border-surface-border flex flex-col gap-2 shadow-sm">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0 shadow-[0_0_8px_rgba(52,211,153,0.5)]" />
+              <span
+                className="font-mono text-[11px] text-slate-200 truncate font-medium"
+                title={currentAccount?.email || activeAccountEmail || 'Cuenta activa'}
+              >
+                {currentAccount?.email || activeAccountEmail || 'Sin cuenta activa'}
+              </span>
             </div>
-          ) : (
-            <div className="text-[11px] text-slate-500 font-mono">Sin cuenta activa</div>
-          )}
+            {currentAccount?.inRotationPool && (
+              <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-accent/15 text-accent border border-accent/30 font-medium shrink-0">
+                POOL
+              </span>
+            )}
+          </div>
+
+          {/* Barra de Cuota 5h */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
+              <span>5h: {quota5hPct !== null ? `${quota5hPct}%` : '—'}</span>
+              <span className="text-slate-400">
+                {reset5hText ? `reset: ${reset5hText.replace(/^en\s+/i, '')}` : 'reset: —'}
+              </span>
+            </div>
+            <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  quota5hPct !== null && quota5hPct <= 10
+                    ? 'bg-rose-500'
+                    : quota5hPct !== null && quota5hPct <= 30
+                    ? 'bg-amber-500'
+                    : 'bg-accent'
+                }`}
+                style={{ width: `${quota5hPct !== null ? Math.max(2, Math.min(100, quota5hPct)) : 0}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Barra de Cuota Semanal */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between font-mono text-[10px] text-slate-400">
+              <span>Semanal: {quotaWeeklyPct !== null ? `${quotaWeeklyPct}%` : '—'}</span>
+              <span className="text-slate-400">
+                {resetWeeklyText ? `reset: ${resetWeeklyText.replace(/^en\s+/i, '')}` : 'reset: —'}
+              </span>
+            </div>
+            <div className="w-full h-[3px] rounded-full bg-surface-elevated overflow-hidden">
+              <div
+                className={`h-full rounded-full transition-all duration-300 ${
+                  quotaWeeklyPct !== null && quotaWeeklyPct <= 10
+                    ? 'bg-rose-500'
+                    : quotaWeeklyPct !== null && quotaWeeklyPct <= 30
+                    ? 'bg-amber-500'
+                    : 'bg-emerald-500'
+                }`}
+                style={{ width: `${quotaWeeklyPct !== null ? Math.max(2, Math.min(100, quotaWeeklyPct)) : 0}%` }}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Footer: Acceso directo a Configuración y Tareas programadas con estilo minimalista */}
+        <div className="flex items-center gap-1.5 pt-0.5">
+          <button
+            type="button"
+            onClick={() => setIsTasksModalOpen(true)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs transition-colors"
+            title="Tareas programadas"
+          >
+            <Clock className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[11px] font-sans">Tareas</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={onOpenSettings}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs transition-colors"
+            title="Configuración global y pool"
+          >
+            <Settings className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-[11px] font-sans">Ajustes</span>
+          </button>
 
           {onSyncAntigravity && (
             <button
@@ -726,18 +850,6 @@ export function Sidebar({
             </button>
           )}
         </div>
-
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-xs text-slate-300 hover:text-white transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <Settings className="w-3.5 h-3.5 text-slate-400" />
-            <span>Configuración</span>
-          </div>
-          <span className="text-[10px] text-slate-500 font-mono">Pool / Permisos</span>
-        </button>
       </div>
 
       {/* Modal de Confirmación para Eliminación */}
