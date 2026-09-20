@@ -1194,3 +1194,73 @@ test('Markdown: Detección de enlaces externos y atributos seguros rel y target'
   assert.equal(safeAttributes.rel, 'noopener noreferrer');
 });
 
+// 52. Verificación de Ancho Redimensionable del Gestor de Archivos (Resizable bounds)
+test('File Explorer: Normalización y límites de ancho (min 220px, max 700px, default 320px)', () => {
+  const clampWidth = (val) => {
+    const num = parseInt(val, 10);
+    if (isNaN(num)) return 320;
+    return Math.max(220, Math.min(num, 700));
+  };
+
+  assert.equal(clampWidth(undefined), 320, 'Sin valor debe retornar 320px');
+  assert.equal(clampWidth('invalido'), 320, 'Valor no numérico debe retornar 320px');
+  assert.equal(clampWidth(100), 220, 'Valores inferiores a 220px se ajustan al mínimo 220px');
+  assert.equal(clampWidth(450), 450, 'Valores intermedios se respetan');
+  assert.equal(clampWidth(900), 700, 'Valores superiores a 700px se ajustan al máximo 700px');
+});
+
+// 53. Verificación de Búsqueda y Filtrado Recursivo de Archivos
+test('File Explorer: filterTree busca archivos recursivamente ignorando mayúsculas', () => {
+  const filterTree = (nodes, query) => {
+    if (!query || !query.trim()) return nodes;
+    const q = query.toLowerCase().trim();
+
+    return nodes.reduce((acc, node) => {
+      if (node.isDirectory) {
+        const filteredChildren = node.children ? filterTree(node.children, query) : [];
+        if (node.name.toLowerCase().includes(q) || filteredChildren.length > 0) {
+          acc.push({ ...node, children: filteredChildren });
+        }
+      } else {
+        if (node.name.toLowerCase().includes(q)) {
+          acc.push(node);
+        }
+      }
+      return acc;
+    }, []);
+  };
+
+  const sampleTree = [
+    {
+      name: 'src',
+      isDirectory: true,
+      children: [
+        { name: 'page.tsx', isDirectory: false },
+        { name: 'layout.tsx', isDirectory: false },
+        {
+          name: 'chat',
+          isDirectory: true,
+          children: [
+            { name: 'chat-canvas.tsx', isDirectory: false },
+            { name: 'file-explorer.tsx', isDirectory: false },
+          ]
+        }
+      ]
+    },
+    { name: 'package.json', isDirectory: false },
+    { name: 'README.md', isDirectory: false }
+  ];
+
+  const emptyResult = filterTree(sampleTree, '');
+  assert.equal(emptyResult.length, 3, 'Búsqueda vacía retorna todos los elementos');
+
+  const canvasResult = filterTree(sampleTree, 'canvas');
+  assert.equal(canvasResult.length, 1, 'Debe encontrar la carpeta raíz src');
+  assert.equal(canvasResult[0].children[0].children[0].name, 'chat-canvas.tsx');
+
+  const jsonResult = filterTree(sampleTree, 'JSON');
+  assert.equal(jsonResult.length, 1, 'Insensible a mayúsculas');
+  assert.equal(jsonResult[0].name, 'package.json');
+});
+
+

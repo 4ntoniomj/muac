@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Folder,
   FolderOpen,
@@ -20,6 +20,10 @@ import {
   File,
   Check,
   AlertTriangle,
+  Search,
+  Copy,
+  Info,
+  MessageSquare,
 } from 'lucide-react';
 import { formatFileSize } from '@/shared/time-utils';
 
@@ -54,6 +58,29 @@ export function FileExplorer({
   const [showHidden, setShowHidden] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [workspaceName, setWorkspaceName] = useState<string>('');
+
+  // Estado de ancho redimensionable (persistencia en localStorage, límites 220px - 700px)
+  const [panelWidth, setPanelWidth] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('muac_file_explorer_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 220 && parsed <= 700) {
+          return parsed;
+        }
+      }
+    }
+    return 320;
+  });
+  const [isResizing, setIsResizing] = useState(false);
+
+  // Estados para búsqueda y filtrado rápido
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
+  // Estado para el archivo o carpeta actualmente seleccionado para inspeccionar
+  const [selectedItem, setSelectedItem] = useState<FileItem | null>(null);
+  const [isCopiedPath, setIsCopiedPath] = useState(false);
 
   // Estados para creación y edición
   const [createModal, setCreateModal] = useState<{
@@ -136,6 +163,63 @@ export function FileExplorer({
 
     return () => clearInterval(interval);
   }, [isOpen, workspacePath, showHidden, loadDirectory]);
+
+  // Manejo de redimensionado interactivo del panel mediante arrastre del separador izquierdo
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // Al estar en el lateral derecho, el ancho es la distancia desde el cursor hasta el borde derecho de la ventana
+      const newWidth = Math.max(220, Math.min(window.innerWidth - e.clientX, 700));
+      setPanelWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      localStorage.setItem('muac_file_explorer_width', panelWidth.toString());
+    };
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing, panelWidth]);
+
+  // Copiar ruta de archivo al portapapeles
+  const handleCopyPath = (pathText: string) => {
+    navigator.clipboard.writeText(pathText);
+    setIsCopiedPath(true);
+    setTimeout(() => setIsCopiedPath(false), 2000);
+  };
+
+  // Filtrar el árbol de archivos recursivamente según el término de búsqueda
+  const filterTree = useCallback((nodes: FileItem[], query: string): FileItem[] => {
+    if (!query.trim()) return nodes;
+    const q = query.toLowerCase().trim();
+
+    return nodes.reduce<FileItem[]>((acc, node) => {
+      if (node.isDirectory) {
+        const filteredChildren = node.children ? filterTree(node.children, query) : [];
+        if (node.name.toLowerCase().includes(q) || filteredChildren.length > 0) {
+          acc.push({
+            ...node,
+            children: filteredChildren,
+          });
+        }
+      } else {
+        if (node.name.toLowerCase().includes(q)) {
+          acc.push(node);
+        }
+      }
+      return acc;
+    }, []);
+  }, []);
+
+  const displayedItems = useMemo(() => {
+    return filterTree(items, searchQuery);
+  }, [items, searchQuery, filterTree]);
 
   // Alternar expandir/colapsar carpeta
   const toggleDirectory = async (dirRelativePath: string) => {
@@ -272,18 +356,25 @@ export function FileExplorer({
   // Renderizar nodo del árbol recursivamente
   const renderTreeItem = (item: FileItem, depth = 0) => {
     const isExpanded = expandedDirs.has(item.relativePath);
+    const isSelected = selectedItem?.path === item.path;
 
     return (
       <div key={item.path} className="flex flex-col select-none">
         <div
-          className={`group flex items-center justify-between py-1 px-2 rounded-lg hover:bg-[#1f242e] transition-colors cursor-pointer text-xs ${
-            item.isHidden ? 'opacity-65' : ''
-          }`}
+          className={`group flex items-center justify-between py-1 px-2 rounded-lg transition-colors cursor-pointer text-xs ${
+            isSelected
+              ? 'bg-blue-600/25 text-white font-medium border border-blue-500/40 shadow-sm'
+              : 'hover:bg-[#1f242e] text-slate-300'
+          } ${item.isHidden ? 'opacity-60' : ''}`}
           style={{ paddingLeft: `${depth * 14 + 8}px` }}
           onClick={() => {
+            setSelectedItem(item);
             if (item.isDirectory) {
               toggleDirectory(item.relativePath);
-            } else if (onSelectFile) {
+            }
+          }}
+          onDoubleClick={() => {
+            if (!item.isDirectory && onSelectFile) {
               onSelectFile(item);
             }
           }}
@@ -428,85 +519,262 @@ export function FileExplorer({
   if (!isOpen) return null;
 
   return (
-    <aside className="w-72 h-full bg-[#111317] border-l border-[#1e222b] flex flex-col select-none shrink-0 relative font-sans text-xs z-20">
-      {/* Cabecera del Gestor de Archivos */}
-      <div className="p-3 border-b border-[#1e222b] flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
-          <Folder className="w-4 h-4 text-amber-400 shrink-0" />
-          <span className="font-semibold text-slate-200 truncate text-xs">
-            {workspaceName || 'Workspace'}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={() => loadDirectory('', false)}
-            disabled={isLoading}
-            className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-            title="Actualizar archivos"
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-400' : ''}`} />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setShowHidden(!showHidden)}
-            className={`p-1.5 rounded-lg transition-colors ${
-              showHidden
-                ? 'bg-blue-950/60 text-blue-300 border border-blue-500/30'
-                : 'hover:bg-[#1a1d24] text-slate-400 hover:text-white'
-            }`}
-            title={showHidden ? 'Ocultar archivos ocultos (.)' : 'Mostrar archivos ocultos (.)'}
-          >
-            {showHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              setCreateModal({ isOpen: true, type: 'file', targetDir: '', name: '' })
-            }
-            className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-            title="Nuevo archivo en la raíz"
-          >
-            <FilePlus className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              setCreateModal({ isOpen: true, type: 'directory', targetDir: '', name: '' })
-            }
-            className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-            title="Nueva carpeta en la raíz"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-            title="Cerrar panel de archivos"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
-        </div>
+    <aside
+      style={{ width: `${panelWidth}px` }}
+      className={`h-full bg-[#111317] border-l border-[#1e222b] flex flex-col select-none shrink-0 relative font-sans text-xs z-20 ${
+        isResizing ? '' : 'transition-[width] duration-150'
+      }`}
+    >
+      {/* Separador arrastrable (Drag Handle) en el borde izquierdo */}
+      <div
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setIsResizing(true);
+        }}
+        onDoubleClick={() => {
+          setPanelWidth(320);
+          localStorage.setItem('muac_file_explorer_width', '320');
+        }}
+        className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 group flex items-center justify-center transition-colors ${
+          isResizing ? 'bg-blue-500/80' : 'hover:bg-blue-500/40'
+        }`}
+        title="Arrastra para redimensionar el panel (doble clic para restablecer a 320px)"
+      >
+        <div
+          className={`w-0.5 h-10 rounded-full transition-colors ${
+            isResizing ? 'bg-white' : 'bg-slate-600/50 group-hover:bg-blue-300'
+          }`}
+        />
       </div>
 
-      {/* Lista del Árbol de Archivos */}
-      <div className="flex-1 overflow-y-auto p-1.5 flex flex-col gap-0.5">
+      {/* Cabecera del Gestor de Archivos */}
+      <div className="p-2.5 border-b border-[#1e222b] flex flex-col gap-2 bg-[#0e1015]">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+            <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+            <span className="font-semibold text-slate-200 truncate text-xs" title={workspaceName || workspacePath}>
+              {workspaceName || 'Workspace'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsSearchOpen(!isSearchOpen)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                isSearchOpen || searchQuery
+                  ? 'bg-blue-950/60 text-blue-300 border border-blue-500/30'
+                  : 'hover:bg-[#1a1d24] text-slate-400 hover:text-white'
+              }`}
+              title="Buscar o filtrar archivos"
+            >
+              <Search className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => loadDirectory('', false)}
+              disabled={isLoading}
+              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
+              title="Actualizar archivos"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-400' : ''}`} />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowHidden(!showHidden)}
+              className={`p-1.5 rounded-lg transition-colors ${
+                showHidden
+                  ? 'bg-blue-950/60 text-blue-300 border border-blue-500/30'
+                  : 'hover:bg-[#1a1d24] text-slate-400 hover:text-white'
+              }`}
+              title={showHidden ? 'Ocultar archivos ocultos (.)' : 'Mostrar archivos ocultos (.)'}
+            >
+              {showHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setCreateModal({ isOpen: true, type: 'file', targetDir: '', name: '' })
+              }
+              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
+              title="Nuevo archivo en la raíz"
+            >
+              <FilePlus className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                setCreateModal({ isOpen: true, type: 'directory', targetDir: '', name: '' })
+              }
+              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
+              title="Nueva carpeta en la raíz"
+            >
+              <FolderPlus className="w-3.5 h-3.5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
+              title="Cerrar panel de archivos"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Campo de búsqueda / filtro rápido */}
+        {isSearchOpen && (
+          <div className="relative flex items-center animate-in fade-in slide-in-from-top-1 duration-150">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Filtrar por nombre de archivo..."
+              className="w-full bg-[#161922] border border-[#242936] focus:border-blue-500/70 rounded-lg pl-8 pr-7 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none transition-all"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 text-slate-400 hover:text-white p-0.5"
+                title="Limpiar búsqueda"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Indicador de filtro activo */}
+      {searchQuery && (
+        <div className="px-3 py-1 bg-blue-950/40 border-b border-blue-900/30 text-[10px] text-blue-300 flex items-center justify-between">
+          <span>Filtrando por: &quot;{searchQuery}&quot;</span>
+          <span>{displayedItems.length} resultados</span>
+        </div>
+      )}
+
+      {/* Lista del Árbol de Archivos con scroll independiente */}
+      <div className="flex-1 overflow-y-auto p-1.5 flex flex-col gap-0.5 min-h-[140px]">
         {!workspacePath ? (
           <div className="p-4 text-center text-slate-500 text-xs">
             Selecciona un proyecto para explorar sus archivos.
           </div>
-        ) : items.length === 0 && !isLoading ? (
+        ) : displayedItems.length === 0 && !isLoading ? (
           <div className="p-4 text-center text-slate-500 text-xs">
-            No hay archivos en este directorio.
+            {searchQuery
+              ? `No se encontraron archivos con "${searchQuery}"`
+              : 'No hay archivos en este directorio.'}
           </div>
         ) : (
-          items.map((item) => renderTreeItem(item, 0))
+          displayedItems.map((item) => renderTreeItem(item, 0))
+        )}
+      </div>
+
+      {/* Panel Inferior: Inspector del Archivo Seleccionado o Resumen del Workspace */}
+      <div className="shrink-0 border-t border-[#1e222b] bg-[#0c0e12] p-3 text-xs flex flex-col gap-2">
+        {selectedItem ? (
+          <div className="flex flex-col gap-2 animate-in fade-in duration-150">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                {selectedItem.isDirectory ? (
+                  <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                ) : (
+                  getFileIcon(selectedItem.extension, selectedItem.name)
+                )}
+                <span className="font-semibold text-slate-200 truncate text-[11px]" title={selectedItem.name}>
+                  {selectedItem.name}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedItem(null)}
+                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                title="Cerrar detalles"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-1 text-[11px] text-slate-400 font-mono bg-[#14171f] p-2 rounded-lg border border-surface-border/50">
+              <div className="flex items-center justify-between truncate">
+                <span className="text-slate-500">Ruta:</span>
+                <span className="text-slate-300 truncate max-w-[180px]" title={selectedItem.relativePath}>
+                  /{selectedItem.relativePath}
+                </span>
+              </div>
+              {!selectedItem.isDirectory && (
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Tamaño:</span>
+                  <span className="text-slate-300">{formatFileSize(selectedItem.size)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Modificado:</span>
+                <span className="text-slate-400 text-[10px]">
+                  {new Date(selectedItem.modifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 pt-0.5">
+              <button
+                type="button"
+                onClick={() => handleCopyPath(selectedItem.relativePath)}
+                className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-md bg-[#1a1e27] hover:bg-[#242a36] text-slate-300 hover:text-white border border-surface-border text-[11px] transition-colors"
+                title="Copiar ruta relativa"
+              >
+                {isCopiedPath ? (
+                  <>
+                    <Check className="w-3 h-3 text-emerald-400" />
+                    <span className="text-emerald-400">Copiada</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-3 h-3 text-slate-400" />
+                    <span>Copiar ruta</span>
+                  </>
+                )}
+              </button>
+
+              {!selectedItem.isDirectory && onSelectFile && (
+                <button
+                  type="button"
+                  onClick={() => onSelectFile(selectedItem)}
+                  className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-medium transition-colors shadow-sm"
+                  title="Insertar referencia @archivo en el mensaje"
+                >
+                  <MessageSquare className="w-3 h-3" />
+                  <span>Insertar @</span>
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-1.5 text-[11px] text-slate-400">
+            <div className="flex items-center justify-between text-slate-300 font-semibold">
+              <span className="flex items-center gap-1.5">
+                <Info className="w-3.5 h-3.5 text-blue-400" />
+                <span>Workspace activo</span>
+              </span>
+              <span className="text-[10px] text-slate-500 font-mono">
+                {items.length} elementos
+              </span>
+            </div>
+            <div className="text-[10px] font-mono text-slate-500 truncate bg-[#14171f] px-2 py-1 rounded border border-surface-border/40" title={workspacePath}>
+              {workspacePath}
+            </div>
+            <p className="text-[10px] text-slate-500 leading-tight pt-0.5">
+              Haz clic en cualquier archivo para ver sus detalles o insertarlo en el chat con @.
+            </p>
+          </div>
         )}
       </div>
 

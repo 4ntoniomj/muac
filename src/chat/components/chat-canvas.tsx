@@ -678,9 +678,9 @@ export function ChatCanvas({
           <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
             <div
               ref={messagesContainerRef}
-          onScroll={handleScroll}
-          className="flex-1 overflow-y-auto px-6 py-4 flex flex-col gap-6 max-w-4xl w-full mx-auto scroll-smooth"
-        >
+              onScroll={handleScroll}
+              className="flex-1 overflow-y-auto px-4 sm:px-8 py-4 flex flex-col gap-6 max-w-5xl xl:max-w-6xl w-full mx-auto scroll-smooth"
+            >
         {messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 select-none">
             <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-xl shadow-blue-500/20 mb-4 bg-surface-elevated/40 border border-white/10 flex items-center justify-center p-1">
@@ -948,7 +948,7 @@ export function ChatCanvas({
           </div>
         )}
 
-        <div className="max-w-4xl w-full mx-auto flex flex-col gap-2">
+        <div className="max-w-5xl xl:max-w-6xl w-full mx-auto flex flex-col gap-2">
           {/* Controles Superiores: Desplegables de Modelos, Esfuerzo, Cuentas, Workspace y Aro de Contexto */}
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2 flex-wrap">
