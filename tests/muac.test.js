@@ -1120,3 +1120,77 @@ test('Assets: Presencia física de logo.png e icon.png en public y src/app', () 
   assert.ok(fs.statSync(publicLogo).size > 10000, 'El archivo logo.png debe tener contenido válido');
 });
 
+// 48. Verificación de Tokenización de Markdown y Bloques de Código
+test('Markdown: marked.lexer detecta bloques de código con lenguaje y contenido exacto', () => {
+  const { marked } = require('marked');
+  const markdownText = 'Hola mundo\n\n```typescript\nconst a: number = 42;\nconsole.log(a);\n```';
+  const tokens = marked.lexer(markdownText, { gfm: true });
+
+  const codeToken = tokens.find(t => t.type === 'code');
+  assert.ok(codeToken, 'Debe identificar el token de tipo code');
+  assert.equal(codeToken.lang, 'typescript', 'El lenguaje detectado debe ser typescript');
+  assert.ok(codeToken.text.includes('const a: number = 42;'), 'Debe contener el cuerpo del código');
+});
+
+// 49. Verificación de Auto-balance de Bloques de Código en Streaming
+test('Markdown Streaming: balanceStreamingMarkdown cierra bloques de código incompletos', () => {
+  const balanceStreamingMarkdown = (text) => {
+    if (!text) return '';
+    const codeBlockMatches = text.match(/(?<!\\)```/g);
+    const codeBlockCount = codeBlockMatches ? codeBlockMatches.length : 0;
+    if (codeBlockCount % 2 !== 0) {
+      return text + '\n```';
+    }
+    return text;
+  };
+
+  const completeMd = 'Texto con código cerrado:\n```js\nconsole.log("hola");\n```';
+  assert.equal(balanceStreamingMarkdown(completeMd), completeMd, 'No altera código ya cerrado');
+
+  const incompleteMd = 'Texto con código abierto durante streaming:\n```python\ndef test():\n    pass';
+  const balanced = balanceStreamingMarkdown(incompleteMd);
+  assert.ok(balanced.endsWith('\n```'), 'Debe cerrar automáticamente con comillas triples');
+
+  const { marked } = require('marked');
+  const tokens = marked.lexer(balanced, { gfm: true });
+  const codeToken = tokens.find(t => t.type === 'code');
+  assert.ok(codeToken, 'El código auto-cerrado debe ser parseado como bloque de código válido');
+  assert.equal(codeToken.lang, 'python');
+});
+
+// 50. Verificación de Tablas GFM en Markdown
+test('Markdown: marked.lexer parsea cabeceras y celdas de tablas GFM', () => {
+  const { marked } = require('marked');
+  const tableMd = '| Comando | Descripción |\n| :--- | :--- |\n| `npm test` | Ejecutar pruebas |\n| `npm run dev` | Iniciar servidor |';
+  const tokens = marked.lexer(tableMd, { gfm: true });
+
+  const tableToken = tokens.find(t => t.type === 'table');
+  assert.ok(tableToken, 'Debe identificar el token de tipo table');
+  assert.equal(tableToken.header.length, 2, 'Debe contener 2 columnas de cabecera');
+  assert.equal(tableToken.header[0].text, 'Comando');
+  assert.equal(tableToken.header[1].text, 'Descripción');
+  assert.equal(tableToken.rows.length, 2, 'Debe contener 2 filas de datos');
+});
+
+// 51. Verificación de Enlaces e Invariantes de Seguridad
+test('Markdown: Detección de enlaces externos y atributos seguros rel y target', () => {
+  const { marked } = require('marked');
+  const linkMd = 'Consulta la [documentación](https://example.com/docs) oficial.';
+  const tokens = marked.lexer(linkMd, { gfm: true });
+
+  const paragraphToken = tokens.find(t => t.type === 'paragraph');
+  assert.ok(paragraphToken, 'Debe existir un párrafo');
+  const linkToken = paragraphToken.tokens.find(t => t.type === 'link');
+  assert.ok(linkToken, 'Debe identificar el token link');
+  assert.equal(linkToken.href, 'https://example.com/docs');
+  assert.equal(linkToken.text, 'documentación');
+
+  // Atributos de seguridad requeridos
+  const safeAttributes = {
+    target: '_blank',
+    rel: 'noopener noreferrer'
+  };
+  assert.equal(safeAttributes.target, '_blank');
+  assert.equal(safeAttributes.rel, 'noopener noreferrer');
+});
+

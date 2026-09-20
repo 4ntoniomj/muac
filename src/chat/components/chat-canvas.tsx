@@ -47,6 +47,7 @@ import {
   PanelRightClose,
 } from 'lucide-react';
 import { FileExplorer } from './file-explorer';
+import { MarkdownRenderer } from './markdown-renderer';
 
 interface ChatCanvasProps {
   messages: Message[];
@@ -823,9 +824,27 @@ export function ChatCanvas({
 
                   {/* Contenido de Texto */}
                   {msg.content && (
-                    <div className="whitespace-pre-wrap font-sans text-xs break-words leading-relaxed">
-                      {renderMessageContentWithMedia(msg.content)}
-                    </div>
+                    isUser ? (
+                      <div className="whitespace-pre-wrap font-sans text-xs break-words leading-relaxed">
+                        {renderMessageContentWithMedia(msg.content)}
+                      </div>
+                    ) : (
+                      <div className="font-sans text-xs break-words leading-relaxed">
+                        <MarkdownRenderer
+                          content={msg.content}
+                          onPreviewImage={(src, alt) =>
+                            setPreviewAttachment({
+                              id: `inline_${Date.now()}`,
+                              name: alt || 'imagen.png',
+                              type: 'image',
+                              url: src,
+                              size: 0,
+                              mimeType: 'image/png',
+                            })
+                          }
+                        />
+                      </div>
+                    )
                   )}
 
                   {/* Si el mensaje del asistente es muy extenso (> 35 líneas), botón para descargarlo como archivo */}
@@ -880,8 +899,21 @@ export function ChatCanvas({
             {streamingDelta && (
               <div className="flex text-xs leading-relaxed justify-start">
                 <div className="w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1 flex flex-col gap-2.5">
-                  <div className="whitespace-pre-wrap font-sans text-xs break-words">
-                    {streamingDelta}
+                  <div className="font-sans text-xs break-words">
+                    <MarkdownRenderer
+                      content={streamingDelta}
+                      isStreaming={true}
+                      onPreviewImage={(src, alt) =>
+                        setPreviewAttachment({
+                          id: `inline_${Date.now()}`,
+                          name: alt || 'imagen.png',
+                          type: 'image',
+                          url: src,
+                          size: 0,
+                          mimeType: 'image/png',
+                        })
+                      }
+                    />
                     <span className="inline-block w-1.5 h-3.5 ml-1 bg-blue-400 animate-pulse align-middle" />
                   </div>
                 </div>
