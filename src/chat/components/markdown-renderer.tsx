@@ -84,29 +84,29 @@ function CodeBlock({ code, lang }: { code: string; lang?: string }) {
   };
 
   return (
-    <div className="my-2.5 rounded-xl bg-[#0c0e14] border border-[#222735] overflow-hidden shadow-lg select-none">
+    <div className="my-2.5 rounded-lg bg-canvas border border-surface-border overflow-hidden shadow-md select-none">
       {/* Barra superior del bloque de código */}
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#141722] border-b border-[#222735] text-[11px] text-slate-400">
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-surface-elevated border-b border-surface-border text-[11px] text-slate-400">
         <div className="flex items-center gap-2">
-          <Code className="w-3.5 h-3.5 text-blue-400" />
+          <Code className="w-3.5 h-3.5 text-accent" />
           <span className="font-mono font-medium text-slate-300">{formatLanguage(lang)}</span>
         </div>
 
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-white/10 text-slate-400 hover:text-white transition-colors cursor-pointer text-[11px]"
+          className="flex items-center gap-1 px-2 py-0.5 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors cursor-pointer text-[11px]"
           title="Copiar código al portapapeles"
         >
           {isCopied ? (
             <>
               <Check className="w-3 h-3 text-emerald-400" />
-              <span className="text-emerald-400 font-medium">¡Copiado!</span>
+              <span className="text-emerald-400 font-medium font-sans">¡Copiado!</span>
             </>
           ) : (
             <>
               <Copy className="w-3 h-3" />
-              <span>Copiar</span>
+              <span className="font-sans">Copiar</span>
             </>
           )}
         </button>
@@ -180,7 +180,7 @@ export function MarkdownRenderer({
           return (
             <code
               key={idx}
-              className="px-1.5 py-0.5 mx-0.5 rounded bg-[#181c26] text-amber-300 font-mono text-[11px] border border-slate-700/60 select-text"
+              className="px-1.5 py-0.5 mx-0.5 rounded bg-surface-elevated text-amber-300 font-mono text-[11px] border border-surface-border select-text"
             >
               {t.text}
             </code>
@@ -200,7 +200,7 @@ export function MarkdownRenderer({
               href={t.href}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-blue-400 hover:text-blue-300 underline underline-offset-2 break-all transition-colors inline-flex items-center gap-0.5"
+              className="text-accent hover:underline underline-offset-2 break-all transition-colors inline-flex items-center gap-0.5"
               title={t.title || t.href}
             >
               <span>{renderInlineTokens(t.tokens) || t.text}</span>
@@ -215,7 +215,7 @@ export function MarkdownRenderer({
               src={t.href}
               alt={t.text}
               title={t.title || t.text}
-              className="max-h-72 max-w-full rounded-xl object-contain bg-black/40 border border-white/10 cursor-pointer hover:opacity-95 transition-opacity my-2 shadow-md"
+              className="max-h-72 max-w-full rounded-lg object-contain bg-black/40 border border-surface-border cursor-pointer hover:opacity-95 transition-opacity my-2 shadow-md"
               onClick={() => onPreviewImage?.(t.href, t.text || 'imagen_markdown.png')}
             />
           );
@@ -246,27 +246,27 @@ export function MarkdownRenderer({
         const inlineNodes = renderInlineTokens(token.tokens);
         if (depth === 1) {
           return (
-            <h1 key={index} className="text-base font-bold text-white mt-4 mb-2 first:mt-0 leading-snug">
+            <h1 key={index} className="text-base font-bold text-white mt-4 mb-2 first:mt-0 leading-snug font-sans">
               {inlineNodes}
             </h1>
           );
         }
         if (depth === 2) {
           return (
-            <h2 key={index} className="text-sm font-bold text-white mt-3.5 mb-1.5 first:mt-0 leading-snug">
+            <h2 key={index} className="text-sm font-bold text-white mt-3.5 mb-1.5 first:mt-0 leading-snug font-sans">
               {inlineNodes}
             </h2>
           );
         }
         if (depth === 3) {
           return (
-            <h3 key={index} className="text-xs font-bold text-slate-100 mt-3 mb-1 first:mt-0 leading-snug">
+            <h3 key={index} className="text-xs font-bold text-slate-100 mt-3 mb-1 first:mt-0 leading-snug font-sans">
               {inlineNodes}
             </h3>
           );
         }
         return (
-          <h4 key={index} className="text-xs font-semibold text-slate-200 mt-2.5 mb-1 first:mt-0 leading-snug">
+          <h4 key={index} className="text-xs font-semibold text-slate-200 mt-2.5 mb-1 first:mt-0 leading-snug font-sans">
             {inlineNodes}
           </h4>
         );
@@ -274,7 +274,7 @@ export function MarkdownRenderer({
 
       case 'paragraph':
         return (
-          <p key={index} className="text-xs text-slate-200 leading-relaxed my-1.5 break-words">
+          <p key={index} className="text-xs text-slate-200 leading-relaxed my-1.5 break-words font-sans">
             {renderInlineTokens(token.tokens)}
           </p>
         );
@@ -287,7 +287,7 @@ export function MarkdownRenderer({
           <ListTag
             key={index}
             start={typeof listToken.start === 'number' ? listToken.start : 1}
-            className={`my-2 pl-5 text-xs text-slate-200 space-y-1 leading-relaxed ${
+            className={`my-2 pl-5 text-xs text-slate-200 space-y-1 leading-relaxed font-sans ${
               isOrdered ? 'list-decimal' : 'list-disc'
             }`}
           >
@@ -335,7 +335,7 @@ export function MarkdownRenderer({
         return (
           <blockquote
             key={index}
-            className="border-l-2 border-blue-500/70 pl-3.5 py-1.5 my-2.5 bg-blue-950/20 text-slate-300 italic rounded-r-xl text-xs leading-relaxed"
+            className="border-l-2 border-accent/70 pl-3.5 py-1.5 my-2.5 bg-accent/10 text-slate-300 italic rounded-r-md text-xs leading-relaxed font-sans"
           >
             {quoteToken.tokens?.map((t: Token, idx: number) => renderBlockToken(t, idx))}
           </blockquote>
@@ -345,29 +345,29 @@ export function MarkdownRenderer({
       case 'table': {
         const tableToken = token as Tokens.Table;
         return (
-          <div key={index} className="overflow-x-auto my-3 rounded-xl border border-surface-border shadow-sm select-text">
+          <div key={index} className="overflow-x-auto my-3 rounded-lg border border-surface-border shadow-sm select-text">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-surface-elevated/90 border-b border-surface-border">
+                <tr className="bg-surface-elevated border-b border-surface-border">
                   {tableToken.header.map((cell: Tokens.TableCell, cellIdx: number) => (
                     <th
                       key={cellIdx}
                       style={{ textAlign: tableToken.align[cellIdx] || undefined }}
-                      className="px-3 py-2 font-semibold text-slate-200 text-xs whitespace-nowrap"
+                      className="px-3 py-2 font-semibold text-slate-200 text-xs whitespace-nowrap font-sans"
                     >
                       {renderInlineTokens(cell.tokens)}
                     </th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-border/50 bg-[#10131a]/60">
+              <tbody className="divide-y divide-surface-border bg-surface/60">
                 {tableToken.rows.map((row: Tokens.TableCell[], rowIdx: number) => (
                   <tr key={rowIdx} className="hover:bg-white/[0.03] transition-colors">
                     {row.map((cell: Tokens.TableCell, cellIdx: number) => (
                       <td
                         key={cellIdx}
                         style={{ textAlign: tableToken.align[cellIdx] || undefined }}
-                        className="px-3 py-2 text-slate-300 text-xs"
+                        className="px-3 py-2 text-slate-300 text-xs font-sans"
                       >
                         {renderInlineTokens(cell.tokens)}
                       </td>
@@ -381,7 +381,7 @@ export function MarkdownRenderer({
       }
 
       case 'hr':
-        return <hr key={index} className="my-3 border-[#222736]" />;
+        return <hr key={index} className="my-3 border-surface-border" />;
 
       default:
         return (

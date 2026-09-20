@@ -555,26 +555,26 @@ export function ChatCanvas({
       }}
     >
       {/* Barra Superior del Chat con Título y Botón para Mostrar/Ocultar Historial */}
-      <header className="h-12 border-b border-surface-border/70 px-4 flex items-center justify-between bg-surface/40 backdrop-blur-md shrink-0 select-none z-10">
+      <header className="h-11 border-b border-surface-border px-4 flex items-center justify-between bg-sidebar/80 backdrop-blur-sm shrink-0 select-none z-10">
         <div className="flex items-center gap-2.5 min-w-0">
           {onToggleSidebar && (
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-surface-elevated transition-all border border-transparent hover:border-surface-border"
+              className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-surface-hover transition-colors border border-transparent hover:border-surface-border"
               title={isSidebarOpen ? 'Ocultar historial de conversaciones' : 'Mostrar historial de conversaciones'}
             >
-              {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4 text-blue-400" />}
+              {isSidebarOpen ? <PanelLeftClose className="w-4 h-4" /> : <PanelLeft className="w-4 h-4 text-accent" />}
             </button>
           )}
 
           <div className="flex items-center gap-2 truncate">
-            <h2 className="text-xs font-semibold text-slate-200 truncate">
+            <h2 className="text-xs font-semibold text-slate-200 truncate font-sans">
               {activeConversationTitle || 'Nueva conversación'}
             </h2>
             {projectPath && (
               <span
-                className="text-[10px] px-2 py-0.5 rounded-md bg-surface-elevated border border-surface-border text-amber-300 font-mono truncate max-w-[220px]"
+                className="bg-surface border border-surface-border text-slate-400 font-mono text-[10px] rounded-md px-2 py-0.5 truncate max-w-[220px]"
                 title={projectPath}
               >
                 📁 {projectPath.split('/').filter(Boolean).pop() || projectPath}
@@ -584,7 +584,7 @@ export function ChatCanvas({
         </div>
 
         <div className="flex items-center gap-2 text-slate-400">
-          <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-surface-elevated/70 border border-surface-border">
+          <span className="bg-surface border border-surface-border text-slate-400 font-mono text-[10px] rounded-md px-2 py-0.5">
             {messages.length} {messages.length === 1 ? 'mensaje' : 'mensajes'}
           </span>
 
@@ -596,15 +596,15 @@ export function ChatCanvas({
                 setIsFileExplorerOpen(next);
                 localStorage.setItem('muac_file_explorer_open', String(next));
               }}
-              className={`p-1.5 rounded-xl transition-all border flex items-center gap-1.5 text-xs ${
+              className={`p-1.5 rounded-md transition-colors border flex items-center gap-1.5 text-xs ${
                 isFileExplorerOpen
-                  ? 'bg-amber-950/60 text-amber-300 border-amber-500/40 shadow-sm'
-                  : 'text-slate-400 hover:text-white hover:bg-surface-elevated border-transparent hover:border-surface-border'
+                  ? 'bg-surface-active text-amber-300 border-amber-500/40 shadow-sm'
+                  : 'text-slate-400 hover:text-white hover:bg-surface-hover border-transparent hover:border-surface-border'
               }`}
               title={isFileExplorerOpen ? 'Ocultar explorador de archivos' : 'Mostrar explorador de archivos del proyecto'}
             >
               <FolderTree className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline text-[11px] font-medium">Archivos</span>
+              <span className="hidden sm:inline text-[11px] font-medium font-sans">Archivos</span>
             </button>
           )}
         </div>
@@ -683,11 +683,11 @@ export function ChatCanvas({
             >
         {messages.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center text-center p-8 select-none">
-            <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-xl shadow-blue-500/20 mb-4 bg-surface-elevated/40 border border-white/10 flex items-center justify-center p-1">
+            <div className="w-10 h-10 rounded-xl bg-surface border border-surface-border p-1.5 shadow-sm mb-3 flex items-center justify-center">
               <img src="/logo.png" alt="muac" className="w-full h-full object-contain" />
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">muac · Antigravity Pro</h3>
-            <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed">
+            <h3 className="text-lg font-bold tracking-tight text-white font-sans mb-1">muac · Antigravity Pro</h3>
+            <p className="text-xs text-slate-400 max-w-md mb-6 leading-relaxed font-sans">
               Chat con inteligencia artificial, rotación automática de cuentas y soporte de archivos, fotos y videos.
             </p>
 
@@ -695,19 +695,19 @@ export function ChatCanvas({
               <button
                 type="button"
                 onClick={() => setInputText('Explícame cómo funciona la rotación automática de cuentas en muac')}
-                className="p-3 rounded-xl bg-surface-elevated/60 hover:bg-surface-elevated border border-surface-border text-xs text-slate-300 hover:text-white transition-all text-left"
+                className="bg-surface hover:bg-surface-hover border border-surface-border rounded-lg p-3 text-xs transition-colors text-left"
               >
-                <div className="font-semibold text-blue-400 mb-1">Rotación automática</div>
-                <div className="text-[11px] text-slate-400">¿Cómo conmuta entre cuentas de 5h?</div>
+                <div className="font-semibold text-accent mb-1 font-sans">Rotación automática</div>
+                <div className="text-[11px] text-slate-400 font-sans">¿Cómo conmuta entre cuentas de 5h?</div>
               </button>
 
               <button
                 type="button"
                 onClick={() => setInputText('Escribe un script en TypeScript para monitorear límites de API')}
-                className="p-3 rounded-xl bg-surface-elevated/60 hover:bg-surface-elevated border border-surface-border text-xs text-slate-300 hover:text-white transition-all text-left"
+                className="bg-surface hover:bg-surface-hover border border-surface-border rounded-lg p-3 text-xs transition-colors text-left"
               >
-                <div className="font-semibold text-emerald-400 mb-1">Código técnico</div>
-                <div className="text-[11px] text-slate-400">Script de TypeScript para monitoreo</div>
+                <div className="font-semibold text-emerald-400 mb-1 font-sans">Código técnico</div>
+                <div className="text-[11px] text-slate-400 font-sans">Script de TypeScript para monitoreo</div>
               </button>
             </div>
           </div>
@@ -725,25 +725,25 @@ export function ChatCanvas({
                 }`}
               >
                 <div
-                  className={`flex flex-col gap-2.5 transition-all ${
+                  className={`flex flex-col gap-2.5 transition-colors ${
                     isUser
-                      ? 'max-w-[85%] rounded-2xl rounded-tr-sm px-4 py-3 shadow-md bg-surface-elevated border border-surface-border text-slate-200'
-                      : 'w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1'
+                      ? 'max-w-[85%] rounded-lg px-3.5 py-2.5 shadow-sm bg-surface-elevated border border-surface-border text-slate-200'
+                      : 'w-full max-w-[95%] bg-transparent border-none shadow-none text-slate-200 px-0.5 py-1 leading-relaxed font-sans'
                   }`}
                 >
                   {/* Adjuntos del Mensaje (Fotos, Videos, Audios, Archivos) */}
                   {msg.attachments && msg.attachments.length > 0 && (
                     <div className="flex flex-col gap-2 pt-0.5">
                       {msg.attachments.map((att) => (
-                        <div key={att.id} className="rounded-xl overflow-hidden">
+                        <div key={att.id} className="rounded-lg overflow-hidden">
                           {att.type === 'image' ? (
                             <div className="relative group cursor-pointer" onClick={() => setPreviewAttachment(att)}>
                               <img
                                 src={att.url}
                                 alt={att.name}
-                                className="max-h-72 max-w-full rounded-xl object-contain bg-black/40 border border-white/10 hover:opacity-95 transition-opacity"
+                                className="max-h-72 max-w-full rounded-lg object-contain bg-black/40 border border-surface-border hover:opacity-95 transition-opacity"
                               />
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-xl flex items-center justify-center gap-2 text-white text-xs font-medium">
+                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-lg flex items-center justify-center gap-2 text-white text-xs font-medium">
                                 <Eye className="w-4 h-4" />
                                 <span>Ver imagen completa</span>
                               </div>
@@ -753,23 +753,23 @@ export function ChatCanvas({
                               <video
                                 src={att.url}
                                 controls
-                                className="max-h-72 max-w-full rounded-xl bg-black border border-white/10"
+                                className="max-h-72 max-w-full rounded-lg bg-black border border-surface-border"
                               />
                             </div>
                           ) : att.type === 'audio' ? (
                             <div
-                              className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                              className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${
                                 isUser
-                                  ? 'bg-black/30 border-surface-border/60 text-slate-200'
+                                  ? 'bg-black/30 border-surface-border text-slate-200'
                                   : 'bg-surface-elevated border-surface-border text-slate-200'
                               }`}
                             >
-                              <div className="w-9 h-9 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
-                                <Volume2 className="w-5 h-5" />
+                              <div className="w-8 h-8 rounded-md bg-accent/20 flex items-center justify-center text-blue-300 shrink-0">
+                                <Volume2 className="w-4 h-4" />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <div className="text-xs font-semibold truncate">{att.name}</div>
-                                <div className="text-[10px] opacity-75 font-mono">
+                                <div className="text-xs font-semibold truncate font-sans">{att.name}</div>
+                                <div className="text-[10px] text-slate-400 font-mono">
                                   {formatFileSize(att.size)} • Nota de voz
                                 </div>
                                 <audio controls src={att.url} className="w-full h-8 mt-1.5 accent-blue-500" />
@@ -777,19 +777,19 @@ export function ChatCanvas({
                             </div>
                           ) : (
                             <div
-                              className={`flex items-center justify-between gap-3 p-2.5 rounded-xl border transition-all ${
+                              className={`flex items-center justify-between gap-3 p-2.5 rounded-lg border transition-colors ${
                                 isUser
-                                  ? 'bg-black/30 border-surface-border/60 text-slate-200'
+                                  ? 'bg-black/30 border-surface-border text-slate-200'
                                   : 'bg-surface-elevated border-surface-border text-slate-200'
                               }`}
                             >
                               <div className="flex items-center gap-3 min-w-0 flex-1">
-                                <div className="w-8 h-8 rounded-lg bg-blue-500/20 flex items-center justify-center text-blue-300 shrink-0">
+                                <div className="w-8 h-8 rounded-md bg-accent/20 flex items-center justify-center text-blue-300 shrink-0">
                                   <FileText className="w-4 h-4" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="text-xs font-semibold truncate">{att.name}</div>
-                                  <div className="text-[10px] opacity-75">
+                                  <div className="text-xs font-semibold truncate font-sans">{att.name}</div>
+                                  <div className="text-[10px] text-slate-400 font-mono">
                                     {att.lineCount ? `${att.lineCount} líneas • ` : ''}
                                     {formatFileSize(att.size)}
                                   </div>
@@ -799,7 +799,7 @@ export function ChatCanvas({
                                 <button
                                   type="button"
                                   onClick={() => setPreviewAttachment(att)}
-                                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                                  className="p-1.5 rounded-md hover:bg-surface-hover text-slate-300 hover:text-white transition-colors"
                                   title="Previsualizar contenido"
                                 >
                                   <Eye className="w-3.5 h-3.5" />
@@ -809,7 +809,7 @@ export function ChatCanvas({
                                   download={att.name}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="p-1.5 rounded-lg hover:bg-white/10 text-slate-300 hover:text-white transition-colors"
+                                  className="p-1.5 rounded-md hover:bg-surface-hover text-slate-300 hover:text-white transition-colors"
                                   title="Descargar archivo"
                                 >
                                   <Download className="w-3.5 h-3.5" />
@@ -853,10 +853,10 @@ export function ChatCanvas({
                       <button
                         type="button"
                         onClick={() => handleDownloadTextAsFile(msg.content, `respuesta_${msg.id.slice(-6)}.txt`)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface border border-surface-border hover:bg-slate-700 text-slate-300 hover:text-white text-[10px] transition-all"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface border border-surface-border hover:bg-surface-hover text-slate-300 hover:text-white font-mono text-[10px] transition-colors"
                         title="Descargar esta respuesta como archivo de texto"
                       >
-                        <FileCode className="w-3 h-3 text-blue-400" />
+                        <FileCode className="w-3 h-3 text-accent" />
                         <span>Descargar como archivo ({linesCount} líneas)</span>
                       </button>
                     </div>
@@ -864,7 +864,7 @@ export function ChatCanvas({
 
                   {/* Metadatos del mensaje */}
                   {!isUser && msg.usage && (
-                    <div className="mt-1 pt-2 border-t border-slate-800/80 flex items-center gap-3 text-[10px] text-slate-400 font-mono">
+                    <div className="mt-1 pt-2 border-t border-surface-border flex items-center gap-3 font-mono text-[10px] text-slate-500">
                       {msg.durationSeconds !== undefined && (
                         <span className="flex items-center gap-1">
                           <Clock className="w-3 h-3 text-slate-500" />
@@ -927,21 +927,21 @@ export function ChatCanvas({
       </div>
 
       {/* Barra Inferior de Entrada (Input Bar) */}
-      <div className="p-4 border-t border-surface-border bg-surface/50 backdrop-blur-md relative">
+      <div className="p-4 border-t border-surface-border bg-sidebar/80 backdrop-blur-sm relative">
         {/* Botón flotante para volver abajo (solo icono, encima de la barra de escribir mensaje) */}
         {showScrollBottom && (
           <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-30 animate-in fade-in zoom-in-95 duration-200">
             <button
               type="button"
               onClick={scrollToBottom}
-              className="w-10 h-10 rounded-full bg-surface-elevated hover:bg-slate-700 text-slate-200 hover:text-white border border-surface-border shadow-xl hover:shadow-2xl transition-all flex items-center justify-center backdrop-blur-md group hover:border-blue-500/60 cursor-pointer relative hover:scale-105"
+              className="w-9 h-9 rounded-full bg-surface-elevated hover:bg-surface-hover text-slate-200 hover:text-white border border-surface-border shadow-xl hover:shadow-2xl transition-all flex items-center justify-center backdrop-blur-md group hover:border-accent/60 cursor-pointer relative hover:scale-105"
               title="Volver abajo del todo"
             >
-              <ArrowDown className="w-4 h-4 text-blue-400 group-hover:translate-y-0.5 transition-transform" />
+              <ArrowDown className="w-4 h-4 text-accent group-hover:translate-y-0.5 transition-transform" />
               {isStreaming && (
                 <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-blue-500 border border-surface-elevated" />
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-accent border border-surface-elevated" />
                 </span>
               )}
             </button>
@@ -950,7 +950,7 @@ export function ChatCanvas({
 
         <div className="max-w-5xl xl:max-w-6xl w-full mx-auto flex flex-col gap-2">
           {/* Controles Superiores: Desplegables de Modelos, Esfuerzo, Cuentas, Workspace y Aro de Contexto */}
-          <div className="flex items-center justify-between px-1">
+          <div className="flex items-center justify-between px-1 gap-2">
             <div className="flex items-center gap-2 flex-wrap">
               <ModelSelector selectedModelId={activeModelId} onSelectModel={onSelectModel} />
               <ReasoningSlider
@@ -994,18 +994,18 @@ export function ChatCanvas({
           />
 
           {/* Contenedor de Redacción con Chips de Adjuntos */}
-          <div className="flex flex-col p-2 rounded-2xl bg-surface border border-surface-border focus-within:border-blue-500/70 focus-within:ring-1 focus-within:ring-blue-500/40 transition-all shadow-inner gap-2">
+          <div className="bg-surface border border-surface-border focus-within:border-accent/70 rounded-xl p-2 shadow-sm transition-colors flex flex-col gap-2">
             {/* Previsualizaciones de Adjuntos Pendientes */}
             {pendingAttachments.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap px-1 pt-1 border-b border-surface-border/50 pb-2.5">
+              <div className="flex items-center gap-2 flex-wrap px-1 pt-1 border-b border-surface-border pb-2">
                 {pendingAttachments.map((att) => (
                   <div
                     key={att.id}
-                    className="group relative flex items-center gap-2 p-1.5 pr-2.5 rounded-xl bg-surface-elevated border border-surface-border hover:border-slate-600 shadow-sm transition-all animate-in fade-in"
+                    className="bg-surface-elevated border border-surface-border rounded-md p-1.5 text-xs group relative flex items-center gap-2 shadow-sm transition-colors animate-in fade-in"
                   >
                     {att.type === 'image' ? (
                       <div
-                        className="relative w-10 h-10 rounded-lg overflow-hidden bg-black/40 border border-white/10 shrink-0 cursor-pointer group-hover:border-blue-500/50 transition-colors"
+                        className="relative w-8 h-8 rounded-md overflow-hidden bg-black/40 border border-surface-border shrink-0 cursor-pointer group-hover:border-accent/50 transition-colors"
                         onClick={() => setPreviewAttachment(att)}
                         title="Clic para previsualizar imagen en grande"
                       >
@@ -1015,40 +1015,40 @@ export function ChatCanvas({
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
                         />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <Eye className="w-3.5 h-3.5 text-white" />
+                          <Eye className="w-3 h-3 text-white" />
                         </div>
                       </div>
                     ) : att.type === 'video' ? (
                       <div
-                        className="relative w-10 h-10 rounded-lg overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center cursor-pointer group-hover:border-purple-500/60 transition-colors"
+                        className="relative w-8 h-8 rounded-md overflow-hidden bg-purple-950/40 border border-purple-500/30 shrink-0 flex items-center justify-center cursor-pointer group-hover:border-purple-500/60 transition-colors"
                         onClick={() => setPreviewAttachment(att)}
                         title="Clic para previsualizar video"
                       >
-                        <Film className="w-4 h-4 text-purple-400" />
+                        <Film className="w-3.5 h-3.5 text-purple-400" />
                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <Play className="w-3 h-3 text-white fill-white" />
+                          <Play className="w-2.5 h-2.5 text-white fill-white" />
                         </div>
                       </div>
                     ) : att.type === 'audio' ? (
                       <div
-                        className="w-10 h-10 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 cursor-pointer group-hover:border-amber-500/60 transition-colors"
+                        className="w-8 h-8 rounded-md bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shrink-0 cursor-pointer group-hover:border-amber-500/60 transition-colors"
                         onClick={() => setPreviewAttachment(att)}
                         title="Clic para escuchar audio"
                       >
-                        <Volume2 className="w-4 h-4" />
+                        <Volume2 className="w-3.5 h-3.5" />
                       </div>
                     ) : (
                       <div
-                        className="w-10 h-10 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 cursor-pointer group-hover:border-emerald-500/60 transition-colors"
+                        className="w-8 h-8 rounded-md bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shrink-0 cursor-pointer group-hover:border-emerald-500/60 transition-colors"
                         onClick={() => setPreviewAttachment(att)}
                         title="Clic para ver contenido del archivo"
                       >
-                        <FileText className="w-4 h-4" />
+                        <FileText className="w-3.5 h-3.5" />
                       </div>
                     )}
 
-                    <div className="flex flex-col min-w-0 max-w-[150px]">
-                      <span className="text-[11px] font-medium text-slate-200 truncate">{att.name}</span>
+                    <div className="flex flex-col min-w-0 max-w-[140px]">
+                      <span className="text-[11px] font-medium text-slate-200 truncate font-sans">{att.name}</span>
                       <span className="text-[10px] text-slate-400 font-mono">
                         {att.lineCount ? `${att.lineCount} lín • ` : ''}
                         {formatFileSize(att.size)}
@@ -1059,7 +1059,7 @@ export function ChatCanvas({
                       <button
                         type="button"
                         onClick={() => setPreviewAttachment(att)}
-                        className="p-1 rounded-lg hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                        className="p-1 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
                         title="Previsualizar"
                       >
                         <Eye className="w-3 h-3" />
@@ -1067,7 +1067,7 @@ export function ChatCanvas({
                       <button
                         type="button"
                         onClick={() => handleRemoveAttachment(att.id)}
-                        className="p-1 rounded-lg hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
+                        className="p-1 rounded-md hover:bg-rose-500/20 text-slate-400 hover:text-rose-400 transition-colors"
                         title="Quitar"
                       >
                         <X className="w-3 h-3" />
@@ -1084,11 +1084,11 @@ export function ChatCanvas({
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={isStreaming || isUploading}
-                className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-surface-elevated transition-colors shrink-0"
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-surface-hover transition-colors shrink-0"
                 title="Adjuntar fotos, videos o archivos (también puedes arrastrarlos o pegar capturas)"
               >
                 {isUploading ? (
-                  <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                 ) : (
                   <Plus className="w-4 h-4" />
                 )}
@@ -1111,10 +1111,10 @@ export function ChatCanvas({
                 type="button"
                 onClick={handleToggleRecording}
                 disabled={isStreaming}
-                className={`p-2 rounded-xl transition-all shrink-0 flex items-center justify-center gap-1.5 ${
+                className={`p-2 rounded-lg transition-colors shrink-0 flex items-center justify-center gap-1.5 ${
                   isRecording
-                    ? 'bg-red-950/90 border border-red-500/60 text-red-300 shadow-lg shadow-red-950/60 hover:bg-red-900/90'
-                    : 'text-slate-400 hover:text-white hover:bg-surface-elevated'
+                    ? 'bg-rose-950/90 border border-rose-500/60 text-rose-300 shadow-sm hover:bg-rose-900/90'
+                    : 'text-slate-400 hover:text-white hover:bg-surface-hover'
                 }`}
                 title={
                   isRecording
@@ -1124,12 +1124,11 @@ export function ChatCanvas({
               >
                 {isRecording ? (
                   <>
-                    {/* Circulito con un tono más oscuro para que quede claro que está grabando */}
-                    <span className="relative flex h-2.5 w-2.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-600 opacity-75" />
-                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-950 border border-red-600 shadow-inner" />
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-600" />
                     </span>
-                    <Mic className="w-4 h-4 text-red-400 animate-pulse" />
+                    <Mic className="w-4 h-4 text-rose-400 animate-pulse" />
                   </>
                 ) : (
                   <Mic className="w-4 h-4" />
@@ -1140,7 +1139,7 @@ export function ChatCanvas({
                 <button
                   type="button"
                   onClick={onStopStreaming}
-                  className="p-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-semibold transition-all shrink-0 shadow-md shadow-rose-600/30 flex items-center justify-center cursor-pointer animate-pulse"
+                  className="p-2 rounded-lg bg-rose-600 hover:bg-rose-500 text-white shadow-sm transition-colors shrink-0 flex items-center justify-center cursor-pointer"
                   title="Detener respuesta"
                 >
                   <Square className="w-4 h-4 fill-current" />
@@ -1150,10 +1149,10 @@ export function ChatCanvas({
                   type="button"
                   onClick={handleSubmit}
                   disabled={(!inputText.trim() && pendingAttachments.length === 0) || isUploading}
-                  className={`p-2 rounded-xl text-white font-semibold transition-all shrink-0 ${
+                  className={`p-2 rounded-lg font-medium shadow-sm transition-colors shrink-0 ${
                     (inputText.trim() || pendingAttachments.length > 0) && !isUploading
-                      ? 'bg-blue-600 hover:bg-blue-500 shadow-md shadow-blue-600/30'
-                      : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60'
+                      ? 'bg-accent hover:bg-accent-hover text-white cursor-pointer'
+                      : 'bg-surface-hover text-slate-500 cursor-not-allowed opacity-60'
                   }`}
                   title="Enviar mensaje"
                 >
@@ -1193,20 +1192,20 @@ export function ChatCanvas({
           onClick={() => setPreviewAttachment(null)}
         >
           <div
-            className="relative w-full max-w-4xl max-h-[90vh] bg-surface-elevated border border-surface-border rounded-2xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+            className="relative w-full max-w-4xl max-h-[90vh] bg-surface-elevated border border-surface-border rounded-xl shadow-2xl flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Barra superior del modal */}
-            <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-border/80 bg-surface/80">
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-surface-border bg-surface">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 shrink-0">
+                <div className="w-8 h-8 rounded-md bg-accent/20 border border-accent/30 flex items-center justify-center text-accent shrink-0">
                   {previewAttachment.type === 'image' && <ImageIcon className="w-4 h-4" />}
                   {previewAttachment.type === 'video' && <Film className="w-4 h-4" />}
                   {previewAttachment.type === 'audio' && <Volume2 className="w-4 h-4" />}
                   {previewAttachment.type === 'file' && <FileText className="w-4 h-4" />}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-xs font-semibold text-slate-100 truncate">{previewAttachment.name}</h3>
+                  <h3 className="text-xs font-semibold text-slate-100 truncate font-sans">{previewAttachment.name}</h3>
                   <p className="text-[11px] text-slate-400 font-mono">
                     {previewAttachment.lineCount ? `${previewAttachment.lineCount} líneas • ` : ''}
                     {formatFileSize(previewAttachment.size)}
@@ -1223,7 +1222,7 @@ export function ChatCanvas({
                       setIsCopied(true);
                       setTimeout(() => setIsCopied(false), 2000);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface border border-surface-border hover:bg-slate-700 text-slate-300 hover:text-white text-xs transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-surface border border-surface-border hover:bg-surface-hover text-slate-300 hover:text-white text-xs transition-colors"
                     title="Copiar contenido"
                   >
                     {isCopied ? (
@@ -1245,7 +1244,7 @@ export function ChatCanvas({
                   download={previewAttachment.name}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors shadow-sm"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-accent hover:bg-accent-hover text-white text-xs font-medium transition-colors shadow-sm"
                   title="Descargar archivo original"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -1255,7 +1254,7 @@ export function ChatCanvas({
                 <button
                   type="button"
                   onClick={() => setPreviewAttachment(null)}
-                  className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-white/10 transition-colors ml-1"
+                  className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-surface-hover transition-colors ml-1"
                   title="Cerrar vista previa (Esc)"
                 >
                   <X className="w-5 h-5" />
@@ -1270,7 +1269,7 @@ export function ChatCanvas({
                   <img
                     src={previewAttachment.url}
                     alt={previewAttachment.name}
-                    className="max-h-[75vh] max-w-full rounded-xl object-contain shadow-lg border border-white/10"
+                    className="max-h-[75vh] max-w-full rounded-lg object-contain shadow-lg border border-surface-border"
                   />
                 </div>
               )}
@@ -1281,18 +1280,18 @@ export function ChatCanvas({
                     src={previewAttachment.url}
                     controls
                     autoPlay
-                    className="max-h-[75vh] max-w-full rounded-xl shadow-lg border border-white/10 bg-black"
+                    className="max-h-[75vh] max-w-full rounded-lg shadow-lg border border-surface-border bg-black"
                   />
                 </div>
               )}
 
               {previewAttachment.type === 'audio' && (
-                <div className="w-full max-w-md p-8 rounded-2xl bg-surface border border-surface-border flex flex-col items-center gap-5 text-center shadow-xl">
-                  <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shadow-inner">
-                    <Volume2 className="w-8 h-8 animate-pulse" />
+                <div className="w-full max-w-md p-6 rounded-xl bg-surface border border-surface-border flex flex-col items-center gap-4 text-center shadow-xl">
+                  <div className="w-12 h-12 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 shadow-inner">
+                    <Volume2 className="w-6 h-6 animate-pulse" />
                   </div>
                   <div>
-                    <h4 className="text-sm font-semibold text-slate-100">{previewAttachment.name}</h4>
+                    <h4 className="text-sm font-semibold text-slate-100 font-sans">{previewAttachment.name}</h4>
                     <p className="text-xs text-slate-400 font-mono mt-1">Nota de voz • {formatFileSize(previewAttachment.size)}</p>
                   </div>
                   <audio controls autoPlay src={previewAttachment.url} className="w-full mt-2 accent-amber-500" />
@@ -1303,21 +1302,21 @@ export function ChatCanvas({
                 <div className="w-full h-full flex flex-col">
                   {isLoadingPreview ? (
                     <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-400">
-                      <div className="w-6 h-6 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
-                      <span className="text-xs">Cargando vista previa...</span>
+                      <div className="w-6 h-6 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
+                      <span className="text-xs font-sans">Cargando vista previa...</span>
                     </div>
                   ) : previewFileContent !== null ? (
-                    <div className="relative w-full max-h-[70vh] overflow-auto rounded-xl bg-slate-950 p-4 border border-slate-800 text-slate-200 font-mono text-xs leading-relaxed select-text">
+                    <div className="relative w-full max-h-[70vh] overflow-auto rounded-lg bg-canvas p-4 border border-surface-border text-slate-200 font-mono text-xs leading-relaxed select-text">
                       <pre className="whitespace-pre-wrap break-words">{previewFileContent}</pre>
                     </div>
                   ) : (
                     <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
-                      <div className="w-14 h-14 rounded-2xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                        <FileText className="w-7 h-7" />
+                      <div className="w-12 h-12 rounded-lg bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
+                        <FileText className="w-6 h-6" />
                       </div>
                       <div>
-                        <h4 className="text-sm font-semibold text-slate-100 mb-1">{previewAttachment.name}</h4>
-                        <p className="text-xs text-slate-400 max-w-sm">
+                        <h4 className="text-sm font-semibold text-slate-100 mb-1 font-sans">{previewAttachment.name}</h4>
+                        <p className="text-xs text-slate-400 max-w-sm font-sans">
                           Este archivo binario no tiene vista previa de texto directo. Puedes descargarlo para visualizarlo en tu equipo.
                         </p>
                       </div>
@@ -1326,7 +1325,7 @@ export function ChatCanvas({
                         download={previewAttachment.name}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md transition-colors"
+                        className="flex items-center gap-2 px-4 py-2 rounded-md bg-accent hover:bg-accent-hover text-white text-xs font-semibold shadow-md transition-colors"
                       >
                         <Download className="w-4 h-4" />
                         <span>Descargar archivo</span>

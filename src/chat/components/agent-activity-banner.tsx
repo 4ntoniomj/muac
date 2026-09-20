@@ -25,9 +25,9 @@ export function AgentActivityBanner({ activities, isStreaming }: AgentActivityBa
   if (!activities || activities.length === 0) {
     if (!isStreaming) return null;
     return (
-      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-950/40 border border-blue-800/40 text-xs text-blue-300 animate-pulse mb-3 max-w-fit">
-        <Brain className="w-3.5 h-3.5 text-blue-400 animate-bounce" />
-        <span className="font-medium">Iniciando razonamiento con Antigravity...</span>
+      <div className="flex items-center gap-2 rounded-md bg-surface/70 border border-surface-border p-3 text-slate-400 text-xs animate-pulse mb-3 max-w-fit">
+        <Brain className="w-3.5 h-3.5 text-accent animate-bounce" />
+        <span className="font-medium font-sans">Iniciando razonamiento con Antigravity...</span>
       </div>
     );
   }
@@ -37,11 +37,11 @@ export function AgentActivityBanner({ activities, isStreaming }: AgentActivityBa
   const isTool = latestActivity.stepType === 'tool';
 
   const getToolIcon = (name?: string) => {
-    if (!name) return <Cpu className="w-3.5 h-3.5 text-blue-400" />;
+    if (!name) return <Cpu className="w-3.5 h-3.5 text-accent" />;
     if (name.includes('command') || name.includes('terminal')) return <Terminal className="w-3.5 h-3.5 text-emerald-400" />;
     if (name.includes('dir') || name.includes('file')) return <Folder className="w-3.5 h-3.5 text-amber-400" />;
     if (name.includes('edit') || name.includes('write')) return <FileCode className="w-3.5 h-3.5 text-purple-400" />;
-    return <Cpu className="w-3.5 h-3.5 text-blue-400" />;
+    return <Cpu className="w-3.5 h-3.5 text-accent" />;
   };
 
   const getToolParamSummary = (params?: Record<string, unknown>) => {
@@ -55,28 +55,28 @@ export function AgentActivityBanner({ activities, isStreaming }: AgentActivityBa
   };
 
   return (
-    <div className="mb-3.5 rounded-xl bg-surface-elevated/80 border border-surface-border overflow-hidden shadow-md text-xs backdrop-blur-sm max-w-xl">
+    <div className="mb-3.5 rounded-md bg-surface/70 border border-surface-border p-3 text-slate-400 text-xs backdrop-blur-sm max-w-xl">
       {/* Cabecera / Píldora de estado principal */}
       <button
         type="button"
         onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-slate-800/50 transition-colors text-left"
+        className="w-full flex items-center justify-between hover:text-slate-200 transition-colors text-left"
       >
         <div className="flex items-center gap-2 min-w-0">
           {isStreaming ? (
-            <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
+            <Loader2 className="w-3.5 h-3.5 text-accent animate-spin shrink-0" />
           ) : (
             <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           )}
 
-          <span className="font-semibold text-slate-200 truncate">
+          <span className="font-semibold text-slate-200 truncate font-sans">
             {isThinking && 'Razonando respuesta...'}
             {isTool && `Herramienta: ${latestActivity.toolName || 'tool'}`}
             {!isThinking && !isTool && 'Procesando paso...'}
           </span>
 
           {latestActivity.durationSeconds !== undefined && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-surface border border-surface-border text-slate-400 font-mono">
               {latestActivity.durationSeconds.toFixed(2)}s
             </span>
           )}
@@ -86,30 +86,30 @@ export function AgentActivityBanner({ activities, isStreaming }: AgentActivityBa
           </span>
         </div>
 
-        <div className="text-slate-400 p-1">
+        <div className="text-slate-400 p-0.5 hover:text-white transition-colors">
           {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </div>
       </button>
 
       {/* Detalle desplegable de pasos ejecutados */}
       {isExpanded && (
-        <div className="px-3 pb-2.5 pt-1 border-t border-slate-800/60 flex flex-col gap-1.5 max-h-56 overflow-y-auto font-mono text-[11px]">
+        <div className="mt-2.5 pt-2 border-t border-surface-border flex flex-col gap-1.5 max-h-56 overflow-y-auto font-mono text-[11px]">
           {activities.map((act, idx) => {
             const summary = getToolParamSummary(act.toolParameters);
             return (
               <div
                 key={idx}
-                className="flex items-start gap-2 p-1.5 rounded-lg bg-slate-900/60 border border-slate-800/50 text-slate-300"
+                className="flex items-start gap-2 p-1.5 rounded-md bg-surface-elevated border border-surface-border text-slate-300"
               >
                 <div className="mt-0.5 shrink-0">{getToolIcon(act.toolName)}</div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-200">
+                    <span className="font-semibold text-slate-200 font-sans">
                       {act.stepType === 'thinking' ? 'Razonamiento' : act.toolName || act.stepType}
                     </span>
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 shrink-0">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 shrink-0 font-mono">
                       {act.state === 'ACTIVE' && isStreaming && (
-                        <span className="text-blue-400 animate-pulse">en progreso</span>
+                        <span className="text-accent animate-pulse">en progreso</span>
                       )}
                       {act.durationSeconds !== undefined && (
                         <span>{act.durationSeconds.toFixed(2)}s</span>
@@ -118,13 +118,13 @@ export function AgentActivityBanner({ activities, isStreaming }: AgentActivityBa
                   </div>
 
                   {summary && (
-                    <div className="text-[10px] text-slate-400 mt-0.5 truncate bg-slate-950/60 px-1.5 py-0.5 rounded font-mono">
+                    <div className="text-[10px] text-slate-400 mt-0.5 truncate bg-canvas px-1.5 py-0.5 rounded border border-surface-border/50 font-mono">
                       {summary}
                     </div>
                   )}
 
                   {act.toolOutput && (
-                    <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 italic">
+                    <div className="text-[10px] text-slate-500 mt-0.5 line-clamp-2 italic font-mono">
                       {act.toolOutput}
                     </div>
                   )}

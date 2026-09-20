@@ -361,12 +361,12 @@ export function FileExplorer({
     return (
       <div key={item.path} className="flex flex-col select-none">
         <div
-          className={`group flex items-center justify-between py-1 px-2 rounded-lg transition-colors cursor-pointer text-xs ${
+          className={`group flex items-center justify-between py-1 px-2 rounded-md transition-colors cursor-pointer text-xs ${
             isSelected
-              ? 'bg-blue-600/25 text-white font-medium border border-blue-500/40 shadow-sm'
-              : 'hover:bg-[#1f242e] text-slate-300'
+              ? 'bg-surface-active text-white border-l-2 border-accent pl-2 font-medium'
+              : 'hover:bg-surface-hover text-slate-300'
           } ${item.isHidden ? 'opacity-60' : ''}`}
-          style={{ paddingLeft: `${depth * 14 + 8}px` }}
+          style={{ paddingLeft: isSelected ? `${Math.max(8, depth * 14 + 6)}px` : `${depth * 14 + 8}px` }}
           onClick={() => {
             setSelectedItem(item);
             if (item.isDirectory) {
@@ -383,7 +383,7 @@ export function FileExplorer({
             {item.isDirectory ? (
               <button
                 type="button"
-                className="p-0.5 hover:bg-white/10 rounded text-slate-400 hover:text-white"
+                className="p-0.5 hover:bg-surface-hover rounded text-slate-400 hover:text-white"
                 onClick={(e) => {
                   e.stopPropagation();
                   toggleDirectory(item.relativePath);
@@ -401,9 +401,9 @@ export function FileExplorer({
 
             {item.isDirectory ? (
               isExpanded ? (
-                <FolderOpen className="w-4 h-4 text-amber-400 shrink-0" />
+                <FolderOpen className="w-4 h-4 text-accent shrink-0" />
               ) : (
-                <Folder className="w-4 h-4 text-amber-400 shrink-0" />
+                <Folder className="w-4 h-4 text-accent shrink-0" />
               )
             ) : (
               getFileIcon(item.extension, item.name)
@@ -437,7 +437,7 @@ export function FileExplorer({
                       });
                     }}
                     title="Nuevo archivo aquí"
-                    className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white"
+                    className="p-1 hover:bg-surface-hover rounded text-slate-400 hover:text-white"
                   >
                     <FilePlus className="w-3 h-3" />
                   </button>
@@ -453,7 +453,7 @@ export function FileExplorer({
                       });
                     }}
                     title="Nueva carpeta aquí"
-                    className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white"
+                    className="p-1 hover:bg-surface-hover rounded text-slate-400 hover:text-white"
                   >
                     <FolderPlus className="w-3 h-3" />
                   </button>
@@ -472,7 +472,7 @@ export function FileExplorer({
                   });
                 }}
                 title="Renombrar"
-                className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white"
+                className="p-1 hover:bg-surface-hover rounded text-slate-400 hover:text-white"
               >
                 <Edit2 className="w-3 h-3" />
               </button>
@@ -489,7 +489,7 @@ export function FileExplorer({
                   });
                 }}
                 title="Eliminar"
-                className="p-1 hover:bg-red-500/20 rounded text-slate-400 hover:text-red-400"
+                className="p-1 hover:bg-rose-500/20 rounded text-slate-400 hover:text-rose-400"
               >
                 <Trash2 className="w-3 h-3" />
               </button>
@@ -521,7 +521,7 @@ export function FileExplorer({
   return (
     <aside
       style={{ width: `${panelWidth}px` }}
-      className={`h-full bg-[#111317] border-l border-[#1e222b] flex flex-col select-none shrink-0 relative font-sans text-xs z-20 ${
+      className={`h-full bg-sidebar border-l border-surface-border flex flex-col select-none shrink-0 relative font-sans text-xs z-20 ${
         isResizing ? '' : 'transition-[width] duration-150'
       }`}
     >
@@ -536,99 +536,99 @@ export function FileExplorer({
           localStorage.setItem('muac_file_explorer_width', '320');
         }}
         className={`absolute top-0 bottom-0 -left-1.5 w-3 cursor-col-resize z-30 group flex items-center justify-center transition-colors ${
-          isResizing ? 'bg-blue-500/80' : 'hover:bg-blue-500/40'
+          isResizing ? 'bg-accent/80' : 'hover:bg-accent/40'
         }`}
         title="Arrastra para redimensionar el panel (doble clic para restablecer a 320px)"
       >
         <div
           className={`w-0.5 h-10 rounded-full transition-colors ${
-            isResizing ? 'bg-white' : 'bg-slate-600/50 group-hover:bg-blue-300'
+            isResizing ? 'bg-white' : 'bg-surface-border group-hover:bg-accent'
           }`}
         />
       </div>
 
       {/* Cabecera del Gestor de Archivos */}
-      <div className="p-2.5 border-b border-[#1e222b] flex flex-col gap-2 bg-[#0e1015]">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
-            <Folder className="w-4 h-4 text-amber-400 shrink-0" />
-            <span className="font-semibold text-slate-200 truncate text-xs" title={workspaceName || workspacePath}>
-              {workspaceName || 'Workspace'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              type="button"
-              onClick={() => setIsSearchOpen(!isSearchOpen)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                isSearchOpen || searchQuery
-                  ? 'bg-blue-950/60 text-blue-300 border border-blue-500/30'
-                  : 'hover:bg-[#1a1d24] text-slate-400 hover:text-white'
-              }`}
-              title="Buscar o filtrar archivos"
-            >
-              <Search className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => loadDirectory('', false)}
-              disabled={isLoading}
-              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-              title="Actualizar archivos"
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-blue-400' : ''}`} />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowHidden(!showHidden)}
-              className={`p-1.5 rounded-lg transition-colors ${
-                showHidden
-                  ? 'bg-blue-950/60 text-blue-300 border border-blue-500/30'
-                  : 'hover:bg-[#1a1d24] text-slate-400 hover:text-white'
-              }`}
-              title={showHidden ? 'Ocultar archivos ocultos (.)' : 'Mostrar archivos ocultos (.)'}
-            >
-              {showHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setCreateModal({ isOpen: true, type: 'file', targetDir: '', name: '' })
-              }
-              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-              title="Nuevo archivo en la raíz"
-            >
-              <FilePlus className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() =>
-                setCreateModal({ isOpen: true, type: 'directory', targetDir: '', name: '' })
-              }
-              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-              title="Nueva carpeta en la raíz"
-            >
-              <FolderPlus className="w-3.5 h-3.5" />
-            </button>
-
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-1.5 rounded-lg hover:bg-[#1a1d24] text-slate-400 hover:text-white transition-colors"
-              title="Cerrar panel de archivos"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          </div>
+      <div className="h-11 border-b border-surface-border px-3 bg-sidebar/80 flex items-center justify-between">
+        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+          <Folder className="w-4 h-4 text-accent shrink-0" />
+          <span className="font-semibold text-slate-200 truncate text-xs" title={workspaceName || workspacePath}>
+            {workspaceName || 'Workspace'}
+          </span>
         </div>
 
-        {/* Campo de búsqueda / filtro rápido */}
-        {isSearchOpen && (
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsSearchOpen(!isSearchOpen)}
+            className={`p-1.5 rounded-md transition-colors ${
+              isSearchOpen || searchQuery
+                ? 'bg-accent/15 text-accent border border-accent/30'
+                : 'hover:bg-surface-hover text-slate-400 hover:text-white'
+            }`}
+            title="Buscar o filtrar archivos"
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => loadDirectory('', false)}
+            disabled={isLoading}
+            className="p-1.5 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
+            title="Actualizar archivos"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-accent' : ''}`} />
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setShowHidden(!showHidden)}
+            className={`p-1.5 rounded-md transition-colors ${
+              showHidden
+                ? 'bg-accent/15 text-accent border border-accent/30'
+                : 'hover:bg-surface-hover text-slate-400 hover:text-white'
+            }`}
+            title={showHidden ? 'Ocultar archivos ocultos (.)' : 'Mostrar archivos ocultos (.)'}
+          >
+            {showHidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setCreateModal({ isOpen: true, type: 'file', targetDir: '', name: '' })
+            }
+            className="p-1.5 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
+            title="Nuevo archivo en la raíz"
+          >
+            <FilePlus className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={() =>
+              setCreateModal({ isOpen: true, type: 'directory', targetDir: '', name: '' })
+            }
+            className="p-1.5 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
+            title="Nueva carpeta en la raíz"
+          >
+            <FolderPlus className="w-3.5 h-3.5" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-1.5 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
+            title="Cerrar panel de archivos"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Campo de búsqueda / filtro rápido */}
+      {isSearchOpen && (
+        <div className="p-2 border-b border-surface-border bg-sidebar">
           <div className="relative flex items-center animate-in fade-in slide-in-from-top-1 duration-150">
             <Search className="w-3.5 h-3.5 text-slate-500 absolute left-2.5 pointer-events-none" />
             <input
@@ -636,26 +636,26 @@ export function FileExplorer({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Filtrar por nombre de archivo..."
-              className="w-full bg-[#161922] border border-[#242936] focus:border-blue-500/70 rounded-lg pl-8 pr-7 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none transition-all"
+              className="w-full bg-surface border border-surface-border focus:border-accent rounded-md pl-8 pr-7 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none transition-colors"
               autoFocus
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2 text-slate-400 hover:text-white p-0.5"
+                className="absolute right-2 text-slate-400 hover:text-white p-0.5 rounded"
                 title="Limpiar búsqueda"
               >
                 <X className="w-3 h-3" />
               </button>
             )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Indicador de filtro activo */}
       {searchQuery && (
-        <div className="px-3 py-1 bg-blue-950/40 border-b border-blue-900/30 text-[10px] text-blue-300 flex items-center justify-between">
+        <div className="px-3 py-1 bg-surface-elevated border-b border-surface-border text-[10px] text-accent flex items-center justify-between font-mono">
           <span>Filtrando por: &quot;{searchQuery}&quot;</span>
           <span>{displayedItems.length} resultados</span>
         </div>
@@ -679,13 +679,13 @@ export function FileExplorer({
       </div>
 
       {/* Panel Inferior: Inspector del Archivo Seleccionado o Resumen del Workspace */}
-      <div className="shrink-0 border-t border-[#1e222b] bg-[#0c0e12] p-3 text-xs flex flex-col gap-2">
+      <div className="shrink-0 bg-surface border-t border-surface-border p-2.5 text-xs flex flex-col gap-2">
         {selectedItem ? (
           <div className="flex flex-col gap-2 animate-in fade-in duration-150">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 {selectedItem.isDirectory ? (
-                  <Folder className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <Folder className="w-3.5 h-3.5 text-accent shrink-0" />
                 ) : (
                   getFileIcon(selectedItem.extension, selectedItem.name)
                 )}
@@ -696,14 +696,14 @@ export function FileExplorer({
               <button
                 type="button"
                 onClick={() => setSelectedItem(null)}
-                className="p-1 rounded hover:bg-white/10 text-slate-400 hover:text-white transition-colors"
+                className="p-1 rounded-md hover:bg-surface-hover text-slate-400 hover:text-white transition-colors"
                 title="Cerrar detalles"
               >
                 <X className="w-3 h-3" />
               </button>
             </div>
 
-            <div className="flex flex-col gap-1 text-[11px] text-slate-400 font-mono bg-[#14171f] p-2 rounded-lg border border-surface-border/50">
+            <div className="flex flex-col gap-1 text-[11px] text-slate-400 font-mono bg-surface-elevated p-2 rounded-md border border-surface-border">
               <div className="flex items-center justify-between truncate">
                 <span className="text-slate-500">Ruta:</span>
                 <span className="text-slate-300 truncate max-w-[180px]" title={selectedItem.relativePath}>
@@ -728,7 +728,7 @@ export function FileExplorer({
               <button
                 type="button"
                 onClick={() => handleCopyPath(selectedItem.relativePath)}
-                className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-md bg-[#1a1e27] hover:bg-[#242a36] text-slate-300 hover:text-white border border-surface-border text-[11px] transition-colors"
+                className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-md bg-surface-elevated hover:bg-surface-hover text-slate-300 hover:text-white border border-surface-border text-[11px] transition-colors"
                 title="Copiar ruta relativa"
               >
                 {isCopiedPath ? (
@@ -748,7 +748,7 @@ export function FileExplorer({
                 <button
                   type="button"
                   onClick={() => onSelectFile(selectedItem)}
-                  className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-[11px] font-medium transition-colors shadow-sm"
+                  className="flex-1 flex items-center justify-center gap-1 py-1 px-2 rounded-md bg-accent hover:bg-accent-hover text-white text-[11px] font-medium transition-colors shadow-sm"
                   title="Insertar referencia @archivo en el mensaje"
                 >
                   <MessageSquare className="w-3 h-3" />
@@ -761,14 +761,14 @@ export function FileExplorer({
           <div className="flex flex-col gap-1.5 text-[11px] text-slate-400">
             <div className="flex items-center justify-between text-slate-300 font-semibold">
               <span className="flex items-center gap-1.5">
-                <Info className="w-3.5 h-3.5 text-blue-400" />
+                <Info className="w-3.5 h-3.5 text-accent" />
                 <span>Workspace activo</span>
               </span>
               <span className="text-[10px] text-slate-500 font-mono">
                 {items.length} elementos
               </span>
             </div>
-            <div className="text-[10px] font-mono text-slate-500 truncate bg-[#14171f] px-2 py-1 rounded border border-surface-border/40" title={workspacePath}>
+            <div className="text-[10px] font-mono text-slate-500 truncate bg-surface-elevated px-2 py-1 rounded-md border border-surface-border" title={workspacePath}>
               {workspacePath}
             </div>
             <p className="text-[10px] text-slate-500 leading-tight pt-0.5">
@@ -780,8 +780,8 @@ export function FileExplorer({
 
       {/* Modal / Diálogo para Crear Archivo o Carpeta */}
       {createModal.isOpen && (
-        <div className="absolute inset-x-2 top-14 p-3 rounded-xl bg-[#1a1e27] border border-blue-500/40 shadow-2xl z-30 flex flex-col gap-2.5 animate-in fade-in zoom-in-95 duration-100">
-          <div className="flex items-center justify-between text-xs text-blue-300 font-semibold">
+        <div className="absolute inset-x-2 top-14 p-5 rounded-xl bg-surface-elevated border border-surface-border shadow-2xl z-30 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-100">
+          <div className="flex items-center justify-between text-xs text-white font-semibold">
             <span>
               {createModal.type === 'directory' ? 'Nueva carpeta' : 'Nuevo archivo'}
               {createModal.targetDir ? ` en /${createModal.targetDir}` : ''}
@@ -791,7 +791,7 @@ export function FileExplorer({
               onClick={() =>
                 setCreateModal({ isOpen: false, type: 'file', targetDir: '', name: '' })
               }
-              className="text-slate-400 hover:text-white"
+              className="text-slate-400 hover:text-white p-0.5 rounded-md hover:bg-surface-hover transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -808,7 +808,7 @@ export function FileExplorer({
                 setCreateModal({ isOpen: false, type: 'file', targetDir: '', name: '' });
             }}
             placeholder={createModal.type === 'directory' ? 'nombre-carpeta' : 'nombre-archivo.ts'}
-            className="w-full px-2.5 py-1.5 rounded-lg bg-[#111317] border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-blue-500 font-mono"
+            className="w-full px-2.5 py-1.5 rounded-md bg-surface border border-surface-border text-slate-200 text-xs focus:outline-none focus:border-accent font-mono transition-colors"
           />
 
           <div className="flex items-center justify-end gap-2 pt-1">
@@ -817,7 +817,7 @@ export function FileExplorer({
               onClick={() =>
                 setCreateModal({ isOpen: false, type: 'file', targetDir: '', name: '' })
               }
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]"
+              className="px-2.5 py-1 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 text-[11px] transition-colors"
             >
               Cancelar
             </button>
@@ -825,7 +825,7 @@ export function FileExplorer({
               type="button"
               onClick={handleCreate}
               disabled={!createModal.name.trim()}
-              className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-[11px] disabled:opacity-50"
+              className="px-2.5 py-1 rounded-md bg-accent hover:bg-accent-hover text-white font-medium text-[11px] disabled:opacity-50 transition-colors"
             >
               Crear
             </button>
@@ -835,15 +835,15 @@ export function FileExplorer({
 
       {/* Modal / Diálogo para Renombrar */}
       {renameModal.isOpen && (
-        <div className="absolute inset-x-2 top-14 p-3 rounded-xl bg-[#1a1e27] border border-blue-500/40 shadow-2xl z-30 flex flex-col gap-2.5 animate-in fade-in zoom-in-95 duration-100">
-          <div className="flex items-center justify-between text-xs text-blue-300 font-semibold">
+        <div className="absolute inset-x-2 top-14 p-5 rounded-xl bg-surface-elevated border border-surface-border shadow-2xl z-30 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-100">
+          <div className="flex items-center justify-between text-xs text-white font-semibold">
             <span>Renombrar: {renameModal.currentName}</span>
             <button
               type="button"
               onClick={() =>
                 setRenameModal({ isOpen: false, oldPath: '', currentName: '', newName: '' })
               }
-              className="text-slate-400 hover:text-white"
+              className="text-slate-400 hover:text-white p-0.5 rounded-md hover:bg-surface-hover transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -859,7 +859,7 @@ export function FileExplorer({
               if (e.key === 'Escape')
                 setRenameModal({ isOpen: false, oldPath: '', currentName: '', newName: '' });
             }}
-            className="w-full px-2.5 py-1.5 rounded-lg bg-[#111317] border border-slate-700 text-slate-200 text-xs focus:outline-none focus:border-blue-500 font-mono"
+            className="w-full px-2.5 py-1.5 rounded-md bg-surface border border-surface-border text-slate-200 text-xs focus:outline-none focus:border-accent font-mono transition-colors"
           />
 
           <div className="flex items-center justify-end gap-2 pt-1">
@@ -868,7 +868,7 @@ export function FileExplorer({
               onClick={() =>
                 setRenameModal({ isOpen: false, oldPath: '', currentName: '', newName: '' })
               }
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]"
+              className="px-2.5 py-1 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 text-[11px] transition-colors"
             >
               Cancelar
             </button>
@@ -876,7 +876,7 @@ export function FileExplorer({
               type="button"
               onClick={handleRename}
               disabled={!renameModal.newName.trim() || renameModal.newName === renameModal.currentName}
-              className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-[11px] disabled:opacity-50"
+              className="px-2.5 py-1 rounded-md bg-accent hover:bg-accent-hover text-white font-medium text-[11px] disabled:opacity-50 transition-colors"
             >
               Guardar
             </button>
@@ -886,8 +886,8 @@ export function FileExplorer({
 
       {/* Modal / Confirmación de Eliminación */}
       {deleteConfirm.isOpen && (
-        <div className="absolute inset-x-2 top-14 p-3.5 rounded-xl bg-[#1e1518] border border-red-500/40 shadow-2xl z-30 flex flex-col gap-2.5 animate-in fade-in zoom-in-95 duration-100">
-          <div className="flex items-center gap-2 text-red-400 font-semibold text-xs">
+        <div className="absolute inset-x-2 top-14 p-5 rounded-xl bg-surface-elevated border border-surface-border shadow-2xl z-30 flex flex-col gap-3 animate-in fade-in zoom-in-95 duration-100">
+          <div className="flex items-center gap-2 text-rose-400 font-semibold text-xs">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>Eliminar {deleteConfirm.isDirectory ? 'carpeta' : 'archivo'}</span>
           </div>
@@ -903,14 +903,14 @@ export function FileExplorer({
               onClick={() =>
                 setDeleteConfirm({ isOpen: false, path: '', name: '', isDirectory: false })
               }
-              className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px]"
+              className="px-2.5 py-1 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 text-[11px] transition-colors"
             >
               Cancelar
             </button>
             <button
               type="button"
               onClick={handleDelete}
-              className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium text-[11px]"
+              className="px-2.5 py-1 rounded-md bg-rose-600 hover:bg-rose-500 text-white font-medium text-[11px] transition-colors"
             >
               Eliminar
             </button>

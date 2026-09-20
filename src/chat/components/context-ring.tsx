@@ -19,13 +19,10 @@ export function ContextRing({ usage, modelName }: ContextRingProps) {
   const strokeDashoffset = circumference - (clampedPercent / 100) * circumference;
 
   let strokeColor = '#10b981'; // safe: emerald-500
-  let ringGlow = 'rgba(16, 185, 129, 0.3)';
   if (usage?.colorState === 'danger') {
     strokeColor = '#ef4444'; // red-500
-    ringGlow = 'rgba(239, 68, 68, 0.4)';
   } else if (usage?.colorState === 'warning') {
     strokeColor = '#f59e0b'; // amber-500
-    ringGlow = 'rgba(245, 158, 11, 0.35)';
   }
 
   const formatNumber = (n: number) => {
@@ -48,8 +45,8 @@ export function ContextRing({ usage, modelName }: ContextRingProps) {
           cx="16"
           cy="16"
           r={radius}
-          stroke="#262a3b"
-          strokeWidth="3"
+          stroke="#1a1e2b"
+          strokeWidth="2.5"
           fill="transparent"
         />
         {/* Progreso del aro */}
@@ -58,34 +55,31 @@ export function ContextRing({ usage, modelName }: ContextRingProps) {
           cy="16"
           r={radius}
           stroke={strokeColor}
-          strokeWidth="3"
+          strokeWidth="2.5"
           fill="transparent"
           strokeDasharray={circumference}
           strokeDashoffset={strokeDashoffset}
           strokeLinecap="round"
           className="transition-all duration-300 ease-out"
-          style={{
-            filter: `drop-shadow(0 0 4px ${ringGlow})`,
-          }}
         />
       </svg>
 
       {/* Porcentaje en el centro */}
-      <span className="absolute text-[9px] font-mono font-medium text-slate-400 group-hover:text-white transition-colors">
+      <span className="absolute font-mono text-[9px] text-slate-400 group-hover:text-white transition-colors">
         {displayPercent}
       </span>
 
       {/* Tooltip contextual flotante (hacia arriba) */}
       {showTooltip && (
-        <div className="absolute bottom-full mb-2.5 right-0 z-50 px-3 py-2 bg-slate-900/95 border border-slate-700/80 rounded-lg shadow-xl backdrop-blur-md text-xs whitespace-nowrap pointer-events-none transition-all">
-          <div className="font-semibold text-slate-200 flex items-center gap-1.5 mb-1">
+        <div className="absolute bottom-full mb-2.5 right-0 z-50 bg-surface-elevated border border-surface-border rounded-lg shadow-xl p-2.5 text-xs font-mono whitespace-nowrap pointer-events-none transition-all">
+          <div className="font-semibold text-slate-200 flex items-center gap-1.5 mb-1.5 font-sans">
             <span
               className="w-2 h-2 rounded-full inline-block"
               style={{ backgroundColor: strokeColor }}
             />
             <span>Ventana de Contexto ({modelName})</span>
           </div>
-          <div className="text-slate-400 font-mono text-[11px] flex flex-col gap-0.5">
+          <div className="text-slate-400 text-[11px] flex flex-col gap-0.5">
             <div>
               Consumido:{' '}
               <span className="text-slate-200 font-medium">

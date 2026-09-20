@@ -46,7 +46,7 @@ export function AccountSelector({
       <button
         type="button"
         onClick={() => onOpenSettings('cuentas')}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs font-medium text-amber-300 transition-all shadow-sm"
+        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border text-xs font-medium text-accent hover:text-white transition-colors"
       >
         <Plus className="w-3.5 h-3.5" />
         <span>Vincular Cuenta</span>
@@ -93,20 +93,18 @@ export function AccountSelector({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all shadow-sm ${
-          isActiveExhausted
-            ? 'bg-slate-950/80 border-slate-800 text-slate-400 grayscale opacity-70'
-            : 'bg-surface-elevated/70 hover:bg-surface-elevated border-surface-border text-slate-300 hover:text-white'
+        className={`flex items-center gap-2 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border text-xs text-slate-300 hover:text-white px-2.5 py-1.5 transition-colors ${
+          isActiveExhausted ? 'opacity-70 grayscale' : ''
         }`}
         title={`Cuenta activa: ${activeAccount.email} | 5h: ${current5hPct ?? '—'}% (Reset: ${activeReset5hText || 'N/A'}) | Semanal: ${currentWeeklyPct ?? '—'}% (Reset: ${activeResetWeeklyText || 'N/A'})`}
       >
-        <div className="w-4 h-4 rounded-full bg-blue-600/30 text-blue-400 flex items-center justify-center text-[10px] font-bold shrink-0">
+        <div className="w-4 h-4 rounded-full bg-accent/20 text-accent flex items-center justify-center text-[10px] font-bold shrink-0">
           {activeAccount.email[0]?.toUpperCase() || 'U'}
         </div>
         <span className="max-w-[120px] truncate">{activeAccount.email}</span>
 
         {isActiveExhausted ? (
-          <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-red-500/20 text-red-300 border border-red-500/30 flex items-center gap-1">
+          <span className="text-[10px] px-1.5 py-0.5 rounded font-mono bg-red-500/15 text-red-300 border border-red-500/30 flex items-center gap-1">
             <span>AGOTADA</span>
             {activeReset5hText && activeReset5hText !== 'Reestablecido' && (
               <span className="text-[9px] opacity-75">({activeReset5hText})</span>
@@ -116,10 +114,10 @@ export function AccountSelector({
           <span
             className={`text-[10px] px-1.5 py-0.5 rounded font-mono flex items-center gap-1 ${
               current5hPct < 10
-                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                ? 'bg-red-500/15 text-red-300 border border-red-500/30'
                 : current5hPct < 30
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30'
+                : 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
             }`}
           >
             <span>{current5hPct}% {is3p ? '3P' : '5h'}</span>
@@ -135,8 +133,8 @@ export function AccountSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-full mb-2 left-0 z-50 w-96 bg-surface-elevated border border-surface-border rounded-xl shadow-2xl backdrop-blur-md p-1.5 flex flex-col gap-1">
-          <div className="px-2.5 py-1.5 flex items-center justify-between text-[10px] font-semibold tracking-wider text-slate-500 uppercase">
+        <div className="absolute bottom-full mb-2 left-0 z-50 w-96 bg-surface-elevated border border-surface-border rounded-lg shadow-xl p-1.5 text-xs flex flex-col gap-1">
+          <div className="px-2.5 py-1.5 flex items-center justify-between text-[10px] font-semibold tracking-wider text-slate-500 uppercase font-mono">
             <span>Cuentas Vinculadas ({accounts.length})</span>
             <div className="flex items-center gap-2">
               {onRefreshQuotas && (
@@ -147,7 +145,7 @@ export function AccountSelector({
                   className="text-slate-400 hover:text-white flex items-center gap-1 normal-case font-normal transition-colors"
                   title="Actualizar porcentajes de cuota desde agy"
                 >
-                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+                  <RefreshCw className={`w-3 h-3 ${isRefreshing ? 'animate-spin text-accent' : ''}`} />
                   <span>Refrescar</span>
                 </button>
               )}
@@ -157,9 +155,9 @@ export function AccountSelector({
                   setIsOpen(false);
                   onOpenSettings('rotacion');
                 }}
-                className="text-blue-400 hover:text-blue-300 flex items-center gap-1 normal-case font-normal"
+                className="text-slate-400 hover:text-accent flex items-center gap-1 normal-case font-normal transition-colors"
               >
-                <Zap className="w-3 h-3" />
+                <Zap className="w-3 h-3 text-accent" />
                 <span>Pool</span>
               </button>
             </div>
@@ -193,16 +191,16 @@ export function AccountSelector({
                   onSelectAccount(acc.id);
                   setIsOpen(false);
                 }}
-                className={`w-full flex items-center justify-between p-2.5 rounded-lg text-left transition-all ${
+                className={`w-full flex items-center justify-between p-2.5 rounded-md text-left transition-colors ${
                   isExhausted
-                    ? 'bg-slate-950/80 border-slate-800/80 text-slate-500 opacity-60 grayscale-[35%]'
+                    ? 'bg-surface/50 border border-surface-border/40 text-slate-500 opacity-60 grayscale-[35%]'
                     : isSelected
-                    ? 'bg-blue-600/15 border border-blue-500/30 text-white'
-                    : 'hover:bg-slate-800/60 text-slate-300 hover:text-white border border-transparent'
+                    ? 'bg-accent/15 border border-accent/30 text-white rounded-md'
+                    : 'hover:bg-surface-hover text-slate-300 hover:text-white border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-6 h-6 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-slate-200 shrink-0">
+                  <div className="w-6 h-6 rounded-full bg-surface border border-surface-border flex items-center justify-center text-xs font-bold text-slate-300 shrink-0">
                     {acc.email[0]?.toUpperCase()}
                   </div>
                   <div className="min-w-0">
@@ -216,7 +214,7 @@ export function AccountSelector({
                         </span>
                       )}
                       {acc.inRotationPool && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" title="Incluida en Pool" />
+                        <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" title="Incluida en Pool" />
                       )}
                     </div>
                     <div className="flex flex-col gap-0.5 text-[10px] text-slate-400 font-mono mt-0.5">
@@ -248,27 +246,27 @@ export function AccountSelector({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="p-1 rounded text-slate-400 hover:text-blue-300 hover:bg-slate-700/60 transition-all"
+                    className="p-1 rounded-md text-slate-400 hover:text-accent hover:bg-surface transition-colors"
                     title="Abrir verificación oficial de Google en una pestaña nueva"
                   >
                     <ExternalLink className="w-3 h-3" />
                   </a>
-                  {isSelected && <Check className="w-4 h-4 text-blue-400" />}
+                  {isSelected && <Check className="w-4 h-4 text-accent" />}
                 </div>
               </button>
             );
           })}
 
-          <div className="mt-1 pt-1.5 border-t border-slate-800 flex items-center justify-between px-2 py-1 text-xs">
+          <div className="mt-1 pt-1.5 border-t border-surface-border flex items-center justify-between px-2 py-1 text-xs">
             <button
               type="button"
               onClick={() => {
                 setIsOpen(false);
                 onOpenSettings('cuentas');
               }}
-              className="text-blue-400 hover:text-blue-300 flex items-center gap-1 text-[11px]"
+              className="text-slate-400 hover:text-accent flex items-center gap-1 text-[11px] transition-colors"
             >
-              <Plus className="w-3 h-3" />
+              <Plus className="w-3 h-3 text-accent" />
               <span>Añadir cuenta Google</span>
             </button>
 
@@ -279,10 +277,10 @@ export function AccountSelector({
                   setIsOpen(false);
                   onRotateNext();
                 }}
-                className="text-amber-400 hover:text-amber-300 flex items-center gap-1 text-[11px] font-medium bg-amber-500/10 hover:bg-amber-500/20 px-2 py-1 rounded border border-amber-500/20 transition-all"
+                className="text-slate-300 hover:text-white flex items-center gap-1 text-[11px] font-medium bg-surface hover:bg-surface-hover px-2 py-1 rounded-md border border-surface-border transition-colors"
                 title="Conmutar de inmediato a la siguiente cuenta del pool"
               >
-                <Zap className="w-3 h-3 text-amber-400" />
+                <Zap className="w-3 h-3 text-accent" />
                 <span>Iterar a siguiente</span>
               </button>
             )}

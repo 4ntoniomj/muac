@@ -115,14 +115,10 @@ export function WorkspaceSelector({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-all shadow-sm ${
-          projectPath
-            ? 'bg-surface-elevated hover:bg-slate-800 text-slate-200 border-surface-border'
-            : 'bg-surface-elevated/50 hover:bg-surface-elevated text-slate-400 hover:text-slate-200 border-surface-border/60'
-        }`}
+        className="flex items-center gap-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border text-xs text-slate-300 hover:text-white px-2.5 py-1.5 transition-colors"
         title={projectPath ? `Workspace activo: ${projectPath}` : 'Asignar ruta de trabajo local para el agente'}
       >
-        <FolderOpen className={`w-3.5 h-3.5 ${projectPath ? 'text-amber-400' : 'text-slate-500'}`} />
+        <FolderOpen className={`w-3.5 h-3.5 ${projectPath ? 'text-accent' : 'text-slate-500'}`} />
         <span className="max-w-[160px] truncate">{folderDisplayName}</span>
 
         {projectPath && validation?.valid && (
@@ -131,16 +127,16 @@ export function WorkspaceSelector({
       </button>
 
       {isOpen && (
-        <div className="absolute bottom-full mb-2 left-0 z-50 w-80 bg-surface-elevated border border-surface-border rounded-xl shadow-2xl backdrop-blur-md p-3 flex flex-col gap-2.5">
+        <div className="absolute bottom-full mb-2 left-0 z-50 w-80 bg-surface-elevated border border-surface-border rounded-lg shadow-xl p-3 text-xs flex flex-col gap-2.5">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-200 flex items-center gap-1.5">
-              <FolderOpen className="w-4 h-4 text-amber-400" />
+              <FolderOpen className="w-4 h-4 text-accent" />
               <span>Workspace de Trabajo</span>
             </span>
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="text-slate-500 hover:text-slate-300 p-0.5 rounded"
+              className="text-slate-400 hover:text-white p-1 rounded-md hover:bg-surface-hover transition-colors"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -159,19 +155,19 @@ export function WorkspaceSelector({
                 validatePath(e.target.value);
               }}
               placeholder="/home/usuario/mi-proyecto"
-              className="flex-1 bg-surface border border-surface-border focus:border-blue-500 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-mono focus:outline-none"
+              className="flex-1 bg-surface border border-surface-border focus:border-accent rounded-md px-2.5 py-1.5 text-xs font-mono text-slate-200 focus:outline-none transition-colors"
             />
             <button
               type="button"
               onClick={handleBrowseWorkspace}
               disabled={isBrowsing}
               title="Abrir el gestor de archivos nativo para elegir carpeta"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-surface-elevated hover:bg-slate-800 border border-surface-border text-xs text-slate-300 hover:text-white transition-all shrink-0"
+              className="flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-xs text-slate-300 hover:text-white transition-colors shrink-0"
             >
               {isBrowsing ? (
-                <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+                <div className="w-3.5 h-3.5 border-2 border-slate-500 border-t-accent rounded-full animate-spin" />
               ) : (
-                <FolderSearch className="w-3.5 h-3.5 text-amber-400" />
+                <FolderSearch className="w-3.5 h-3.5 text-accent" />
               )}
               <span>Examinar</span>
             </button>
@@ -180,13 +176,13 @@ export function WorkspaceSelector({
           {/* Resultado de validación en tiempo real */}
           {isValidating && (
             <div className="text-[11px] text-slate-400 flex items-center gap-1.5 font-mono">
-              <div className="w-3 h-3 border-2 border-slate-500 border-t-blue-400 rounded-full animate-spin" />
+              <div className="w-3 h-3 border-2 border-slate-500 border-t-accent rounded-full animate-spin" />
               <span>Verificando ruta...</span>
             </div>
           )}
 
           {!isValidating && validation?.valid && (
-            <div className="p-2 rounded-lg bg-emerald-950/40 border border-emerald-800/40 text-[11px] text-emerald-300 flex items-center justify-between">
+            <div className="p-2 rounded-md bg-emerald-950/30 border border-emerald-800/40 text-[11px] text-emerald-300 flex items-center justify-between">
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
                 <span className="font-semibold">{validation.name}</span>
@@ -202,14 +198,14 @@ export function WorkspaceSelector({
           )}
 
           {!isValidating && validation?.valid === false && (
-            <div className="p-2 rounded-lg bg-red-950/40 border border-red-800/40 text-[11px] text-red-300 flex items-center gap-1.5">
+            <div className="p-2 rounded-md bg-red-950/30 border border-red-800/40 text-[11px] text-red-300 flex items-center gap-1.5">
               <AlertCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
               <span>{validation.error || 'La ruta no existe o no es accesible'}</span>
             </div>
           )}
 
           {/* Botones de acción */}
-          <div className="flex items-center justify-between pt-1 border-t border-slate-800 text-xs">
+          <div className="flex items-center justify-between pt-2 border-t border-surface-border text-xs">
             {projectPath ? (
               <button
                 type="button"
@@ -226,14 +222,14 @@ export function WorkspaceSelector({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="px-2.5 py-1 rounded-lg hover:bg-slate-800 text-slate-400 text-xs transition-all"
+                className="px-2.5 py-1 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-400 hover:text-slate-200 text-xs transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleApply}
-                className="flex items-center gap-1 px-3 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-medium text-xs transition-all shadow-sm"
+                className="flex items-center gap-1 px-3 py-1 rounded-md bg-accent hover:bg-accent-hover text-white font-medium text-xs transition-colors shadow-sm"
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>Aplicar</span>

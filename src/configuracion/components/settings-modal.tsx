@@ -160,32 +160,34 @@ export function SettingsModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="w-full max-w-3xl bg-surface border border-surface-border rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+      <div className="bg-surface border border-surface-border rounded-xl shadow-2xl overflow-hidden max-w-3xl w-full max-h-[88vh] flex flex-col font-sans">
         {/* Encabezado del Modal */}
-        <div className="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+        <div className="px-5 py-3.5 border-b border-surface-border bg-sidebar/80 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-blue-600/20 text-blue-400 flex items-center justify-center">
+            <div className="w-7 h-7 rounded-md bg-surface-elevated border border-surface-border text-slate-300 flex items-center justify-center">
               <Sliders className="w-4 h-4" />
             </div>
-            <h2 className="text-base font-bold text-white">Configuración Global</h2>
+            <h2 className="text-sm font-semibold tracking-tight text-white font-sans">
+              Configuración Global
+            </h2>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
+            className="p-1.5 rounded-md text-slate-400 hover:text-white hover:bg-surface-hover transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Barra de Pestañas */}
-        <div className="px-6 border-b border-surface-border flex gap-4 bg-surface/50">
+        <div className="px-5 border-b border-surface-border flex gap-4 bg-sidebar/50">
           <button
             type="button"
             onClick={() => setActiveTab('rotacion')}
-            className={`py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+            className={`py-3 text-xs flex items-center gap-2 border-b-2 transition-colors ${
               activeTab === 'rotacion'
-                ? 'border-blue-500 text-blue-400'
+                ? 'border-accent text-white font-medium'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -196,9 +198,9 @@ export function SettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('cuentas')}
-            className={`py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+            className={`py-3 text-xs flex items-center gap-2 border-b-2 transition-colors ${
               activeTab === 'cuentas'
-                ? 'border-blue-500 text-blue-400'
+                ? 'border-accent text-white font-medium'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -209,9 +211,9 @@ export function SettingsModal({
           <button
             type="button"
             onClick={() => setActiveTab('permisos')}
-            className={`py-3 text-xs font-semibold flex items-center gap-2 border-b-2 transition-all ${
+            className={`py-3 text-xs flex items-center gap-2 border-b-2 transition-colors ${
               activeTab === 'permisos'
-                ? 'border-blue-500 text-blue-400'
+                ? 'border-accent text-white font-medium'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -221,14 +223,14 @@ export function SettingsModal({
         </div>
 
         {/* Contenido de la Pestaña */}
-        <div className="p-6 overflow-y-auto flex-1 flex flex-col gap-6 text-xs text-slate-300">
+        <div className="p-5 overflow-y-auto flex-1 flex flex-col gap-5 text-xs text-slate-300">
           {/* 1. Pestaña Pool de Rotación */}
           {activeTab === 'rotacion' && (
-            <div className="flex flex-col gap-5">
-              <div className="p-3.5 rounded-xl bg-blue-950/30 border border-blue-800/40 flex items-start gap-3">
-                <Zap className="w-4 h-4 text-blue-400 mt-0.5 shrink-0" />
+            <div className="flex flex-col gap-4">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex items-start gap-3">
+                <Zap className="w-4 h-4 text-accent mt-0.5 shrink-0" />
                 <div className="flex-1">
-                  <h4 className="font-semibold text-blue-300 mb-1">
+                  <h4 className="font-semibold text-slate-200 mb-1 text-xs">
                     Conmutación Automática por Límite de Tokens
                   </h4>
                   <p className="text-slate-400 leading-relaxed text-[11px]">
@@ -241,21 +243,21 @@ export function SettingsModal({
                   type="button"
                   onClick={handleManualRefresh}
                   disabled={isRefreshing}
-                  className="px-2.5 py-1.5 rounded-lg bg-surface-elevated hover:bg-slate-700 text-slate-300 hover:text-white border border-surface-border text-[11px] font-medium flex items-center gap-1.5 transition-all shrink-0"
+                  className="bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs font-medium rounded-lg px-3 py-2 transition-colors flex items-center gap-1.5 shrink-0 disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-blue-400' : ''}`} />
+                  <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin text-accent' : ''}`} />
                   <span>Refrescar cuotas</span>
                 </button>
               </div>
 
               {/* Lista de cuentas en el Pool */}
               <div className="flex flex-col gap-2.5">
-                <h4 className="font-semibold text-slate-200">
+                <h4 className="font-semibold text-slate-200 text-xs">
                   Cuentas participantes en la iteración:
                 </h4>
 
                 {accounts.length === 0 ? (
-                  <div className="p-4 rounded-xl bg-surface-elevated/40 border border-surface-border text-center text-slate-500">
+                  <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border text-center text-slate-500 text-xs">
                     No tienes cuentas añadidas. Ve a la pestaña «Cuentas Google OAuth» para añadir cuentas.
                   </div>
                 ) : (
@@ -274,12 +276,12 @@ export function SettingsModal({
                     return (
                       <div
                         key={acc.id}
-                        className={`p-3.5 rounded-xl border transition-all flex flex-col gap-3 ${
+                        className={`p-3.5 rounded-lg border transition-colors flex flex-col gap-3 ${
                           isExhausted
-                            ? 'bg-slate-950/80 border-slate-800/80 opacity-60 grayscale-[35%]'
+                            ? 'bg-surface border-surface-border opacity-60 grayscale-[30%]'
                             : acc.inRotationPool
-                            ? 'bg-surface-elevated/80 border-blue-500/40 shadow-sm'
-                            : 'bg-surface-elevated/30 border-surface-border opacity-70'
+                            ? 'bg-surface-elevated border-accent/40 shadow-sm'
+                            : 'bg-surface-elevated/40 border-surface-border opacity-75'
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -288,25 +290,25 @@ export function SettingsModal({
                               type="checkbox"
                               checked={acc.inRotationPool}
                               onChange={(e) => onTogglePool(acc.id, e.target.checked)}
-                              className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-blue-600 focus:ring-blue-500 focus:ring-offset-slate-900"
+                              className="w-4 h-4 rounded-md border-surface-border bg-surface text-accent focus:ring-accent focus:ring-offset-surface cursor-pointer"
                             />
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className={`font-semibold ${isExhausted ? 'text-slate-400' : 'text-slate-200'}`}>
+                                <span className={`font-semibold text-xs ${isExhausted ? 'text-slate-400' : 'text-slate-200'}`}>
                                   {acc.email}
                                 </span>
                                 {isExhausted && (
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-red-500/20 text-red-300 font-mono border border-red-500/30">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-red-500/10 text-red-400 font-mono border border-red-500/20">
                                     AGOTADA
                                   </span>
                                 )}
                                 {acc.isActive && (
-                                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
                                     ACTIVA
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[10px] text-slate-400">
+                              <span className="text-[11px] text-slate-400 font-sans">
                                 {acc.displayName || 'Cuenta Google'}
                               </span>
                             </div>
@@ -316,7 +318,7 @@ export function SettingsModal({
                             <button
                               type="button"
                               onClick={() => onSetActiveAccount(acc.id)}
-                              className="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 transition-all border border-slate-700"
+                              className="bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs font-medium rounded-lg px-3 py-1.5 transition-colors"
                             >
                               Activar ahora
                             </button>
@@ -324,21 +326,21 @@ export function SettingsModal({
                         </div>
 
                         {/* Barras de progreso de cuota real */}
-                        <div className="grid grid-cols-2 gap-3 pt-2 border-t border-slate-800/80">
+                        <div className="grid grid-cols-2 gap-3 pt-2.5 border-t border-surface-border">
                           <div>
                             <div className="flex items-center justify-between text-[11px] mb-1">
-                              <span className="text-slate-400">Límite 5 Horas:</span>
+                              <span className="text-slate-400 font-sans">Límite 5 Horas:</span>
                               <span
-                                className={`font-mono font-medium ${
+                                className={`font-mono text-[11px] font-medium ${
                                   q5h < 15 ? 'text-red-400' : q5h < 35 ? 'text-amber-400' : 'text-emerald-400'
                                 }`}
                               >
                                 {q5h}% restante
                               </span>
                             </div>
-                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="w-full h-1.5 bg-surface border border-surface-border-subtle rounded-full overflow-hidden">
                               <div
-                                className={`h-full transition-all duration-500 ${
+                                className={`h-full transition-all duration-500 rounded-full ${
                                   q5h < 15 ? 'bg-red-500' : q5h < 35 ? 'bg-amber-500' : 'bg-emerald-500'
                                 }`}
                                 style={{ width: `${q5h}%` }}
@@ -354,18 +356,18 @@ export function SettingsModal({
 
                           <div>
                             <div className="flex items-center justify-between text-[11px] mb-1">
-                              <span className="text-slate-400">Límite Semanal:</span>
+                              <span className="text-slate-400 font-sans">Límite Semanal:</span>
                               <span
-                                className={`font-mono font-medium ${
+                                className={`font-mono text-[11px] font-medium ${
                                   qWeekly < 15 ? 'text-red-400' : qWeekly < 35 ? 'text-amber-400' : 'text-emerald-400'
                                 }`}
                               >
                                 {qWeekly}% restante
                               </span>
                             </div>
-                            <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                            <div className="w-full h-1.5 bg-surface border border-surface-border-subtle rounded-full overflow-hidden">
                               <div
-                                className={`h-full transition-all duration-500 ${
+                                className={`h-full transition-all duration-500 rounded-full ${
                                   qWeekly < 15 ? 'bg-red-500' : qWeekly < 35 ? 'bg-amber-500' : 'bg-emerald-500'
                                 }`}
                                 style={{ width: `${qWeekly}%` }}
@@ -386,8 +388,8 @@ export function SettingsModal({
               </div>
 
               {/* Historial de rotaciones recientes */}
-              <div className="flex flex-col gap-2 pt-3">
-                <div className="flex items-center gap-1.5 text-slate-300 font-semibold">
+              <div className="flex flex-col gap-2 pt-2">
+                <div className="flex items-center gap-1.5 text-slate-200 font-semibold text-xs">
                   <History className="w-3.5 h-3.5 text-slate-400" />
                   <span>Historial de Rotaciones Automáticas</span>
                 </div>
@@ -397,15 +399,15 @@ export function SettingsModal({
                     Aún no se han producido conmutaciones automáticas en esta sesión.
                   </div>
                 ) : (
-                  <div className="max-h-40 overflow-y-auto rounded-xl border border-surface-border divide-y divide-slate-800/80 bg-surface-elevated/40">
+                  <div className="max-h-40 overflow-y-auto rounded-lg border border-surface-border divide-y divide-surface-border bg-surface-elevated">
                     {rotationLogs.map((log) => (
                       <div key={log.id} className="p-2.5 flex items-center justify-between text-[11px]">
                         <div>
                           <div className="text-slate-200">
-                            <span className="font-mono text-red-300">{log.fromEmail}</span> ➔{' '}
-                            <span className="font-mono text-emerald-300">{log.toEmail}</span>
+                            <span className="font-mono text-red-400">{log.fromEmail}</span> ➔{' '}
+                            <span className="font-mono text-emerald-400">{log.toEmail}</span>
                           </div>
-                          <div className="text-slate-400 text-[10px]">{log.reason}</div>
+                          <div className="text-slate-400 text-[10px] font-sans">{log.reason}</div>
                         </div>
                         <span className="text-[10px] font-mono text-slate-500">
                           {new Date(log.timestamp).toLocaleTimeString()}
@@ -420,16 +422,19 @@ export function SettingsModal({
 
           {/* 2. Pestaña Cuentas Google OAuth */}
           {activeTab === 'cuentas' && (
-            <div className="flex flex-col gap-5">
-              <div className="p-3.5 rounded-xl bg-emerald-950/20 border border-emerald-800/30 flex items-start gap-3">
+            <div className="flex flex-col gap-4">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex items-start gap-3">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 mt-0.5 shrink-0" />
                 <div className="flex-1">
-                  <h4 className="font-semibold text-emerald-300 mb-1">
+                  <h4 className="font-semibold text-slate-200 mb-1 text-xs">
                     Multi-Cuenta Google sin colisión de sesión
                   </h4>
                   <p className="text-slate-400 leading-relaxed text-[11px]">
-                    El botón «Añadir cuenta Google» abre la autorización con <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">prompt=select_account</code>.
-                    Esto fuerza a Google a mostrar el selector de cuentas ("Elige una cuenta / Usar otra cuenta")
+                    El botón «Añadir cuenta Google» abre la autorización con{' '}
+                    <code className="text-slate-300 bg-surface border border-surface-border px-1 py-0.5 rounded-md font-mono text-[10px]">
+                      prompt=select_account
+                    </code>
+                    . Esto fuerza a Google a mostrar el selector de cuentas (&quot;Elige una cuenta / Usar otra cuenta&quot;)
                     para que puedas iniciar sesión con tu segunda o tercera cuenta sin que Google tome automáticamente la primera.
                   </p>
                 </div>
@@ -439,7 +444,7 @@ export function SettingsModal({
               <div className="flex items-center gap-3">
                 <a
                   href="/api/auth/google"
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-md shadow-blue-600/20"
+                  className="bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg px-4 py-2 transition-colors shadow-sm flex items-center gap-2"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Añadir nueva cuenta de Google</span>
@@ -448,7 +453,7 @@ export function SettingsModal({
                 <button
                   type="button"
                   onClick={onImportSystemAccount}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-surface-elevated hover:bg-slate-700 text-slate-200 border border-surface-border font-medium transition-all"
+                  className="bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs font-medium rounded-lg px-3 py-2 transition-colors flex items-center gap-2"
                 >
                   <RefreshCw className="w-4 h-4" />
                   <span>Importar cuenta activa del sistema</span>
@@ -456,28 +461,28 @@ export function SettingsModal({
               </div>
 
               {/* Listado de cuentas */}
-              <div className="flex flex-col gap-2">
-                <h4 className="font-semibold text-slate-200">Cuentas vinculadas actualmente:</h4>
+              <div className="flex flex-col gap-2.5">
+                <h4 className="font-semibold text-slate-200 text-xs">Cuentas vinculadas actualmente:</h4>
 
                 {accounts.map((acc) => (
                   <div
                     key={acc.id}
-                    className="p-3.5 rounded-xl bg-surface-elevated border border-surface-border flex items-center justify-between"
+                    className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex items-center justify-between"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center font-bold text-slate-300">
+                      <div className="w-8 h-8 rounded-md bg-surface border border-surface-border flex items-center justify-center font-bold text-slate-300 font-mono text-xs">
                         {acc.email[0]?.toUpperCase()}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-200">{acc.email}</span>
+                          <span className="font-medium text-slate-200 text-xs">{acc.email}</span>
                           {acc.isActive && (
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 font-mono">
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 font-mono border border-emerald-500/20">
                               ACTIVA
                             </span>
                           )}
                         </div>
-                        <span className="text-[11px] text-slate-400">
+                        <span className="text-[11px] text-slate-400 font-sans">
                           {acc.displayName || 'Google Account'}
                         </span>
                       </div>
@@ -488,10 +493,10 @@ export function SettingsModal({
                         href={`/api/auth/verify?accountId=${acc.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-blue-300 text-[11px] font-medium transition-all"
+                        className="bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs font-medium rounded-md px-2.5 py-1.5 transition-colors flex items-center gap-1.5"
                         title="Abrir activación en Google en una pestaña nueva"
                       >
-                        <ExternalLink className="w-3 h-3 text-blue-400" />
+                        <ExternalLink className="w-3.5 h-3.5 text-accent" />
                         <span>Activar en Google ↗</span>
                       </a>
 
@@ -499,7 +504,7 @@ export function SettingsModal({
                         <button
                           type="button"
                           onClick={() => onSetActiveAccount(acc.id)}
-                          className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-[11px] transition-all"
+                          className="bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs font-medium rounded-md px-2.5 py-1.5 transition-colors"
                         >
                           Usar como activa
                         </button>
@@ -511,7 +516,7 @@ export function SettingsModal({
                             onDeleteAccount(acc.id);
                           }
                         }}
-                        className="p-1.5 rounded-lg hover:bg-red-500/20 text-slate-400 hover:text-red-400 transition-all"
+                        className="p-1.5 rounded-md hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors border border-transparent hover:border-red-500/20"
                         title="Eliminar cuenta"
                       >
                         <Trash2 className="w-4 h-4" />
@@ -521,10 +526,10 @@ export function SettingsModal({
                 ))}
               </div>
 
-              {/* Importación manual de Token / JSON */}
-              <div className="p-4 rounded-xl bg-surface-elevated/70 border border-surface-border flex flex-col gap-2.5 mt-2">
+              {/* Importación manual de Token / JSON (desanidado) */}
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-2.5">
                 <h5 className="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
-                  <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                  <Sliders className="w-3.5 h-3.5 text-accent" />
                   <span>Importar token manualmente (Avanzado)</span>
                 </h5>
                 <p className="text-[11px] text-slate-400">
@@ -535,96 +540,104 @@ export function SettingsModal({
                   value={manualTokenInput}
                   onChange={(e) => setManualTokenInput(e.target.value)}
                   placeholder='Pega aquí el JSON del token (ej: {"token": {"access_token": "...", "refresh_token": "..."}})...'
-                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 text-[11px] font-mono resize-none focus:outline-none focus:border-blue-500"
+                  className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full resize-none focus:outline-none"
                 />
-                <div>
+                <div className="flex justify-start">
                   <button
                     type="button"
                     onClick={handleManualTokenImport}
                     disabled={!manualTokenInput.trim() || isImportingToken}
-                    className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-[11px] font-medium transition-all disabled:opacity-50"
+                    className="bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 hover:text-white text-xs font-medium rounded-lg px-3 py-2 transition-colors disabled:opacity-50"
                   >
                     {isImportingToken ? 'Importando...' : 'Importar Token'}
                   </button>
                 </div>
+              </div>
 
-                {/* Configuración de Google Client ID y Client Secret */}
-                <div className="p-4 rounded-xl bg-surface-elevated/70 border border-surface-border flex flex-col gap-3 mt-2">
-                  <div className="flex items-center justify-between">
-                    <h5 className="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
-                      <Zap className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Credenciales Google Cloud OAuth (Client ID & Client Secret)</span>
-                    </h5>
-                    {credsSavedNotice && (
-                      <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium animate-in fade-in">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>¡Guardado correctamente!</span>
-                      </span>
-                    )}
+              {/* Configuración de Google Client ID y Client Secret */}
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <h5 className="font-semibold text-slate-200 text-xs flex items-center gap-1.5">
+                    <Zap className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Credenciales Google Cloud OAuth (Client ID & Client Secret)</span>
+                  </h5>
+                  {credsSavedNotice && (
+                    <span className="text-[11px] text-emerald-400 flex items-center gap-1 font-medium animate-in fade-in">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>¡Guardado correctamente!</span>
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-400 leading-relaxed">
+                  Si no deseas editar manualmente el archivo{' '}
+                  <code className="text-slate-300 bg-surface border border-surface-border px-1 py-0.5 rounded-md font-mono text-[10px]">
+                    .env
+                  </code>{' '}
+                  o colocar un archivo{' '}
+                  <code className="text-slate-300 bg-surface border border-surface-border px-1 py-0.5 rounded-md font-mono text-[10px]">
+                    client_secret_*.json
+                  </code>{' '}
+                  en la raíz, puedes guardar tus claves aquí. Para aplicaciones de escritorio (Desktop App) con PKCE, el Client Secret no es necesario.
+                </p>
+
+                <div className="flex flex-col gap-2.5">
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1 font-sans">
+                      Google Client ID:
+                    </label>
+                    <input
+                      type="text"
+                      value={googleClientId}
+                      onChange={(e) => setGoogleClientId(e.target.value)}
+                      placeholder="ej: xxxxx-xxxxx.apps.googleusercontent.com"
+                      className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full focus:outline-none"
+                    />
                   </div>
-                  <p className="text-[11px] text-slate-400 leading-relaxed">
-                    Si no deseas editar manualmente el archivo <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">.env</code> o colocar un archivo <code className="text-slate-300 bg-slate-800 px-1 py-0.5 rounded">client_secret_*.json</code> en la raíz, puedes guardar tus claves aquí. Para aplicaciones de escritorio (Desktop App) con PKCE, el Client Secret no es necesario.
-                  </p>
 
-                  <div className="flex flex-col gap-2.5">
-                    <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">
-                        Google Client ID:
-                      </label>
-                      <input
-                        type="text"
-                        value={googleClientId}
-                        onChange={(e) => setGoogleClientId(e.target.value)}
-                        placeholder="ej: xxxxx-xxxxx.apps.googleusercontent.com"
-                        className="w-full px-3 py-1.5 rounded-lg bg-background border border-surface-border text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[11px] text-slate-400 mb-1 font-sans">
+                      Google Client Secret (Opcional para Desktop App / PKCE):
+                    </label>
+                    <input
+                      type="password"
+                      value={googleClientSecret}
+                      onChange={(e) => setGoogleClientSecret(e.target.value)}
+                      placeholder="ej: GOCSPX-xxxxxxxxxxxxxxxx"
+                      className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full focus:outline-none"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-[11px] text-slate-400 mb-1">
-                        Google Client Secret (Opcional para Desktop App / PKCE):
-                      </label>
-                      <input
-                        type="password"
-                        value={googleClientSecret}
-                        onChange={(e) => setGoogleClientSecret(e.target.value)}
-                        placeholder="ej: GOCSPX-xxxxxxxxxxxxxxxx"
-                        className="w-full px-3 py-1.5 rounded-lg bg-background border border-surface-border text-slate-200 text-xs font-mono focus:outline-none focus:border-blue-500"
-                      />
-                    </div>
+                  <div className="pt-1 flex items-center justify-between">
+                    <button
+                      type="button"
+                      disabled={isSavingCreds}
+                      onClick={async () => {
+                        setIsSavingCreds(true);
+                        try {
+                          await onUpdateSettings({
+                            googleClientId: googleClientId.trim(),
+                            googleClientSecret: googleClientSecret.trim(),
+                          });
+                          setCredsSavedNotice(true);
+                          setTimeout(() => setCredsSavedNotice(false), 3500);
+                        } finally {
+                          setIsSavingCreds(false);
+                        }
+                      }}
+                      className="bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg px-4 py-2 transition-colors shadow-sm disabled:opacity-50"
+                    >
+                      {isSavingCreds ? 'Guardando...' : 'Guardar Credenciales OAuth'}
+                    </button>
 
-                    <div className="pt-1 flex items-center justify-between">
-                      <button
-                        type="button"
-                        disabled={isSavingCreds}
-                        onClick={async () => {
-                          setIsSavingCreds(true);
-                          try {
-                            await onUpdateSettings({
-                              googleClientId: googleClientId.trim(),
-                              googleClientSecret: googleClientSecret.trim(),
-                            });
-                            setCredsSavedNotice(true);
-                            setTimeout(() => setCredsSavedNotice(false), 3500);
-                          } finally {
-                            setIsSavingCreds(false);
-                          }
-                        }}
-                        className="px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-all shadow-sm"
-                      >
-                        {isSavingCreds ? 'Guardando...' : 'Guardar Credenciales OAuth'}
-                      </button>
-
-                      <a
-                        href="https://console.cloud.google.com/apis/credentials"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-[11px] text-blue-400 hover:underline flex items-center gap-1"
-                      >
-                        <span>Consola de Google Cloud</span>
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    </div>
+                    <a
+                      href="https://console.cloud.google.com/apis/credentials"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] text-accent hover:text-accent-hover transition-colors flex items-center gap-1 hover:underline"
+                    >
+                      <span>Consola de Google Cloud</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
                   </div>
                 </div>
               </div>
@@ -633,11 +646,11 @@ export function SettingsModal({
 
           {/* 3. Pestaña Permisos y Agente */}
           {activeTab === 'permisos' && (
-            <div className="flex flex-col gap-5">
-              <div className="p-3.5 rounded-xl bg-indigo-950/30 border border-indigo-800/40 flex items-start gap-3">
-                <ShieldCheck className="w-4 h-4 text-indigo-400 mt-0.5 shrink-0" />
+            <div className="flex flex-col gap-4">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex items-start gap-3">
+                <ShieldCheck className="w-4 h-4 text-accent mt-0.5 shrink-0" />
                 <div className="flex-1">
-                  <h4 className="font-semibold text-indigo-300 mb-1">
+                  <h4 className="font-semibold text-slate-200 mb-1 text-xs">
                     Permisos y Configuración del Agente
                   </h4>
                   <p className="text-slate-400 leading-relaxed text-[11px]">
@@ -648,15 +661,15 @@ export function SettingsModal({
               </div>
 
               {/* Modelo por defecto y Nivel de Razonamiento */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-1.5">
                   <label className="text-slate-200 font-semibold text-xs">
                     Modelo por defecto de Antigravity:
                   </label>
                   <select
                     value={defaultModelId}
                     onChange={(e) => setDefaultModelId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs"
+                    className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full focus:outline-none cursor-pointer"
                   >
                     {ANTIGRAVITY_MODELS.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -666,14 +679,14 @@ export function SettingsModal({
                   </select>
                 </div>
 
-                <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
+                <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-1.5">
                   <label className="text-slate-200 font-semibold text-xs">
                     Nivel de Razonamiento (Thinking Effort):
                   </label>
                   <select
                     value={reasoningEffort}
                     onChange={(e) => setReasoningEffort(e.target.value as 'low' | 'medium' | 'high')}
-                    className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs"
+                    className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full focus:outline-none cursor-pointer"
                   >
                     <option value="low">Bajo (Low) - Respuestas rápidas</option>
                     <option value="medium">Medio (Medium) - Razonamiento balanceado</option>
@@ -683,10 +696,10 @@ export function SettingsModal({
               </div>
 
               {/* Instrucciones de Sistema (System Prompt) con Advertencia de Modelos */}
-              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-3">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-2.5">
                 <div className="flex items-center justify-between">
                   <label className="text-slate-200 font-semibold text-xs flex items-center gap-2">
-                    <Sliders className="w-3.5 h-3.5 text-blue-400" />
+                    <Sliders className="w-3.5 h-3.5 text-accent" />
                     <span>Instrucciones de Sistema (System Prompt):</span>
                   </label>
                   <span className="text-[10px] text-slate-400 font-mono">Directiva global de comportamiento</span>
@@ -697,18 +710,20 @@ export function SettingsModal({
                   onChange={(e) => setSystemPrompt(e.target.value)}
                   rows={3}
                   placeholder="Define directivas de comportamiento y directrices técnicas personalizadas para el agente..."
-                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs font-sans resize-y leading-relaxed"
+                  className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full resize-y leading-relaxed focus:outline-none"
                 />
 
                 {/* Advertencia de Compatibilidad de Modelos */}
-                <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/40 text-xs flex items-start gap-2.5">
+                <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs flex items-start gap-2.5">
                   <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                  <div className="flex flex-col gap-1 text-[11px] leading-relaxed">
+                  <div className="flex flex-col gap-1 text-[11px] leading-relaxed font-sans">
                     <span className="font-semibold text-amber-300">
                       Modelos que NO tomarán en cuenta este System Prompt:
                     </span>
                     <p className="text-amber-200/90">
-                      Los modelos de terceros (3P) como <strong className="text-amber-100">Claude Sonnet 4.6</strong>, <strong className="text-amber-100">Claude Opus 4.6 (Thinking)</strong> y <strong className="text-amber-100">GPT-OSS 120B</strong> ignoran el System Prompt personalizado debido a las restricciones de aislamiento del harness de Antigravity.
+                      Los modelos de terceros (3P) como <strong className="text-amber-100">Claude Sonnet 4.6</strong>,{' '}
+                      <strong className="text-amber-100">Claude Opus 4.6 (Thinking)</strong> y{' '}
+                      <strong className="text-amber-100">GPT-OSS 120B</strong> ignoran el System Prompt personalizado debido a las restricciones de aislamiento del harness de Antigravity.
                     </p>
                     <p className="text-emerald-400 font-medium">
                       ✓ Los modelos nativos de <strong className="text-emerald-300">Google Gemini (Gemini 3.8 Flash, Gemini 3.7 Flash, Gemini 3.1 Pro)</strong> sí toman en cuenta e incorporan estas directivas en cada interacción.
@@ -718,7 +733,7 @@ export function SettingsModal({
               </div>
 
               {/* Permisos y Capacidades Seleccionables del Agente */}
-              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-3">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-2.5">
                 <div>
                   <h5 className="font-semibold text-slate-200 text-xs mb-1">
                     Permisos y Capacidades del Agente
@@ -729,79 +744,79 @@ export function SettingsModal({
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-md bg-surface border border-surface-border hover:border-surface-border-hover cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={toolPerms.terminalCommands}
                       onChange={(e) => setToolPerms({ ...toolPerms, terminalCommands: e.target.checked })}
-                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                      className="w-4 h-4 mt-0.5 accent-accent rounded-md cursor-pointer shrink-0"
                     />
                     <div>
                       <span className="font-medium text-slate-200 block text-xs">Ejecución en Terminal (Shell)</span>
-                      <span className="text-[10px] text-slate-400">Comandos bash, tests, npm, git y compilaciones del sistema.</span>
+                      <span className="text-[10px] text-slate-400 leading-tight">Comandos bash, tests, npm, git y compilaciones del sistema.</span>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-md bg-surface border border-surface-border hover:border-surface-border-hover cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={toolPerms.fileEdits}
                       onChange={(e) => setToolPerms({ ...toolPerms, fileEdits: e.target.checked })}
-                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                      className="w-4 h-4 mt-0.5 accent-accent rounded-md cursor-pointer shrink-0"
                     />
                     <div>
                       <span className="font-medium text-slate-200 block text-xs">Escritura y Edición de Archivos</span>
-                      <span className="text-[10px] text-slate-400">Crear nuevos ficheros, refactorizar código y aplicar cambios.</span>
+                      <span className="text-[10px] text-slate-400 leading-tight">Crear nuevos ficheros, refactorizar código y aplicar cambios.</span>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-md bg-surface border border-surface-border hover:border-surface-border-hover cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={toolPerms.fileReads}
                       onChange={(e) => setToolPerms({ ...toolPerms, fileReads: e.target.checked })}
-                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                      className="w-4 h-4 mt-0.5 accent-accent rounded-md cursor-pointer shrink-0"
                     />
                     <div>
                       <span className="font-medium text-slate-200 block text-xs">Lectura del Workspace</span>
-                      <span className="text-[10px] text-slate-400">Examinar carpetas, búsquedas grep y lectura de archivos.</span>
+                      <span className="text-[10px] text-slate-400 leading-tight">Examinar carpetas, búsquedas grep y lectura de archivos.</span>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all">
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-md bg-surface border border-surface-border hover:border-surface-border-hover cursor-pointer transition-colors">
                     <input
                       type="checkbox"
                       checked={toolPerms.webAccess}
                       onChange={(e) => setToolPerms({ ...toolPerms, webAccess: e.target.checked })}
-                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                      className="w-4 h-4 mt-0.5 accent-accent rounded-md cursor-pointer shrink-0"
                     />
                     <div>
                       <span className="font-medium text-slate-200 block text-xs">Búsqueda y Navegación Web</span>
-                      <span className="text-[10px] text-slate-400">Consultas de información técnica y descarga de URLs externas.</span>
+                      <span className="text-[10px] text-slate-400 leading-tight">Consultas de información técnica y descarga de URLs externas.</span>
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-2.5 p-2.5 rounded-lg bg-surface border border-surface-border hover:border-slate-700 cursor-pointer transition-all md:col-span-2">
+                  <label className="flex items-start gap-2.5 p-2.5 rounded-md bg-surface border border-surface-border hover:border-surface-border-hover cursor-pointer transition-colors md:col-span-2">
                     <input
                       type="checkbox"
                       checked={toolPerms.subagents}
                       onChange={(e) => setToolPerms({ ...toolPerms, subagents: e.target.checked })}
-                      className="w-4 h-4 mt-0.5 accent-blue-600 rounded cursor-pointer shrink-0"
+                      className="w-4 h-4 mt-0.5 accent-accent rounded-md cursor-pointer shrink-0"
                     />
                     <div>
                       <span className="font-medium text-slate-200 block text-xs">Invocación de Subagentes</span>
-                      <span className="text-[10px] text-slate-400">Delegar tareas en subagentes en paralelo y coordinar ejecución.</span>
+                      <span className="text-[10px] text-slate-400 leading-tight">Delegar tareas en subagentes en paralelo y coordinar ejecución.</span>
                     </div>
                   </label>
                 </div>
               </div>
 
               {/* 1. Dangerously Skip Permissions */}
-              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex items-center justify-between">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex items-center justify-between gap-4">
                 <div className="max-w-[80%]">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-slate-200">Auto-aprobar permisos de herramientas</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300 font-mono">
+                    <span className="font-semibold text-slate-200 text-xs">Auto-aprobar permisos de herramientas</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-accent/10 text-accent font-mono border border-accent/20">
                       --dangerously-skip-permissions
                     </span>
                   </div>
@@ -813,15 +828,15 @@ export function SettingsModal({
                   type="checkbox"
                   checked={dangerouslySkipPermissions}
                   onChange={(e) => setDangerouslySkipPermissions(e.target.checked)}
-                  className="w-5 h-5 accent-blue-600 rounded cursor-pointer"
+                  className="w-4 h-4 accent-accent rounded-md cursor-pointer shrink-0"
                 />
               </div>
 
               {/* 2. Modo de Ejecución */}
-              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-200">Modo de Ejecución del Agente</span>
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">
+                  <span className="font-semibold text-slate-200 text-xs">Modo de Ejecución del Agente</span>
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-surface-hover text-slate-300 font-mono border border-surface-border">
                     --mode
                   </span>
                 </div>
@@ -831,7 +846,7 @@ export function SettingsModal({
                 <select
                   value={agentMode}
                   onChange={(e) => setAgentMode(e.target.value as 'default' | 'accept-edits' | 'plan')}
-                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 focus:outline-none focus:border-blue-500 text-xs"
+                  className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full focus:outline-none cursor-pointer"
                 >
                   <option value="default">Por defecto (Ejecución estándar interactiva)</option>
                   <option value="accept-edits">Aceptar ediciones (accept-edits: aplica cambios de código directamente)</option>
@@ -840,11 +855,11 @@ export function SettingsModal({
               </div>
 
               {/* 3. Sandbox */}
-              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex items-center justify-between">
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex items-center justify-between gap-4">
                 <div className="max-w-[80%]">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-slate-200">Ejecución en Sandbox de Terminal</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700 text-slate-300 font-mono">
+                    <span className="font-semibold text-slate-200 text-xs">Ejecución en Sandbox de Terminal</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-surface-hover text-slate-300 font-mono border border-surface-border">
                       --sandbox
                     </span>
                   </div>
@@ -856,13 +871,13 @@ export function SettingsModal({
                   type="checkbox"
                   checked={sandboxMode}
                   onChange={(e) => setSandboxMode(e.target.checked)}
-                  className="w-5 h-5 accent-blue-600 rounded cursor-pointer"
+                  className="w-4 h-4 accent-accent rounded-md cursor-pointer shrink-0"
                 />
               </div>
 
               {/* 4. Ruta por defecto para proyectos */}
-              <div className="p-4 rounded-xl bg-surface-elevated border border-surface-border flex flex-col gap-2">
-                <span className="font-semibold text-slate-200">Ruta de Proyecto por Defecto (Workspace)</span>
+              <div className="p-3.5 rounded-lg bg-surface-elevated border border-surface-border flex flex-col gap-1.5">
+                <span className="font-semibold text-slate-200 text-xs">Ruta de Proyecto por Defecto (Workspace)</span>
                 <p className="text-[11px] text-slate-400">
                   Directorio local que se usará como base para nuevas conversaciones si no se especifica uno concreto:
                 </p>
@@ -871,15 +886,15 @@ export function SettingsModal({
                   value={defaultProjectPath}
                   onChange={(e) => setDefaultProjectPath(e.target.value)}
                   placeholder="/home/usuario/mi-proyecto"
-                  className="w-full px-3 py-2 rounded-xl bg-background border border-surface-border text-slate-200 font-mono text-xs focus:outline-none focus:border-blue-500"
+                  className="bg-surface border border-surface-border focus:border-accent rounded-md px-3 py-2 text-xs text-slate-200 font-mono transition-colors w-full focus:outline-none"
                 />
               </div>
 
-              <div className="pt-2">
+              <div className="pt-1">
                 <button
                   type="button"
                   onClick={handleSaveGeneral}
-                  className="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold transition-all shadow-md shadow-blue-600/20"
+                  className="bg-accent hover:bg-accent-hover text-white text-xs font-medium rounded-lg px-4 py-2 transition-colors shadow-sm"
                 >
                   Guardar Configuración
                 </button>

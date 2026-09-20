@@ -349,27 +349,35 @@ export function Sidebar({
         isOpen === false
           ? 'w-0 opacity-0 -translate-x-full overflow-hidden border-r-0 pointer-events-none'
           : 'w-64 opacity-100 translate-x-0'
-      } transition-all duration-300 ease-in-out h-full bg-[#111317] border-r border-[#1e222b] flex flex-col select-none shrink-0 relative font-sans text-xs z-30`}
+      } transition-all duration-200 ease-in-out h-full bg-sidebar border-r border-surface-border flex flex-col select-none shrink-0 relative font-sans text-xs z-30`}
     >
       {/* Cabecera de Marca con Logo Oficial */}
-      <div className="px-4 pt-3.5 pb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-6 h-6 rounded-lg overflow-hidden flex items-center justify-center bg-surface-elevated/80 border border-white/10 p-0.5">
+      <div className="px-3.5 pt-3.5 pb-2.5 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <div className="w-5 h-5 rounded-md overflow-hidden flex items-center justify-center bg-surface border border-surface-border p-0.5 shadow-sm">
             <img src="/logo.png" alt="muac" className="w-full h-full object-contain" />
           </div>
-          <span className="font-bold text-sm tracking-tight text-white">muac</span>
+          <span className="font-bold text-sm tracking-tight text-white font-sans">muac</span>
+          <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-elevated text-slate-400 font-normal border border-surface-border">
+            PRO
+          </span>
         </div>
       </div>
 
-      {/* Cabecera Principal: + Nueva conversación */}
-      <div className="p-3 pb-2 flex items-center">
+      {/* Acción Principal: + Nueva conversación con atajo ⌘N */}
+      <div className="px-3 pb-2 flex items-center">
         <button
           type="button"
           onClick={() => onNewConversation()}
-          className="w-full flex items-center justify-start gap-2.5 py-2 px-3.5 rounded-xl bg-[#1a1d24] hover:bg-[#222731] border border-[#262c37] text-slate-200 hover:text-white text-xs font-medium shadow-sm transition-all active:scale-[0.99]"
+          className="w-full flex items-center justify-between py-1.5 px-2.5 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border text-slate-200 hover:text-white text-xs font-medium transition-colors group active:scale-[0.99]"
         >
-          <Plus className="w-4 h-4 text-slate-400" />
-          <span>Nueva conversación</span>
+          <div className="flex items-center gap-2">
+            <Plus className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
+            <span>Nueva conversación</span>
+          </div>
+          <kbd className="text-[10px] font-mono text-slate-500 bg-surface-elevated px-1.5 py-0.5 rounded border border-surface-border/60">
+            ⌘N
+          </kbd>
         </button>
       </div>
 
@@ -381,8 +389,8 @@ export function Sidebar({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Buscar conversaciones..."
-            className="w-full pl-8 pr-7 py-1.5 rounded-xl bg-[#15181f] border border-[#232834] text-slate-200 placeholder:text-slate-500 text-xs focus:outline-none focus:border-blue-500/60 transition-all shadow-inner"
+            placeholder="Buscar en historial..."
+            className="w-full pl-8 pr-7 py-1 rounded-lg bg-surface border border-surface-border text-slate-200 placeholder:text-slate-500 text-xs focus:outline-none focus:border-accent/70 transition-colors"
           />
           {searchQuery && (
             <button
@@ -397,8 +405,8 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Navegación Superior: Historial de conversaciones y Tareas programadas */}
-      <div className="px-3 pb-2 flex flex-col gap-0.5 border-b border-[#1e222b]/80">
+      {/* Navegación Secundaria: Historial y Tareas */}
+      <div className="px-3 pb-2 flex flex-col gap-0.5 border-b border-surface-border/60">
         <button
           type="button"
           onClick={() => {
@@ -409,19 +417,19 @@ export function Sidebar({
               setIsSelectMode(true);
             }
           }}
-          className={`flex items-center justify-between px-2 py-1.5 rounded-lg transition-colors text-xs text-left ${
+          className={`flex items-center justify-between px-2 py-1.5 rounded-md transition-colors text-xs text-left ${
             isSelectMode
-              ? 'bg-blue-950/60 text-blue-300 border border-blue-500/30'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-[#1a1d24]'
+              ? 'bg-accent/15 text-blue-300 border border-accent/30 font-medium'
+              : 'text-slate-400 hover:text-slate-200 hover:bg-surface-hover'
           }`}
           title={isSelectMode ? 'Salir de selección múltiple' : 'Activar selección múltiple de chats'}
         >
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-2">
             <History className="w-3.5 h-3.5 text-slate-400" />
-            <span>Historial de conversaciones</span>
+            <span>Historial completo</span>
           </div>
           {isSelectMode ? (
-            <span className="text-[10px] font-semibold text-blue-400">Modo selección</span>
+            <span className="text-[10px] font-semibold text-blue-400">Selección activa</span>
           ) : (
             <span className="text-[10px] text-slate-500 font-mono">{conversations.length}</span>
           )}
@@ -430,7 +438,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={() => setIsTasksModalOpen(true)}
-          className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-[#1a1d24] transition-colors text-xs text-left"
+          className="flex items-center gap-2 px-2 py-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-surface-hover transition-colors text-xs text-left"
         >
           <Clock className="w-3.5 h-3.5 text-slate-400" />
           <span>Tareas programadas</span>
@@ -439,14 +447,14 @@ export function Sidebar({
 
       {/* Acciones en Lote cuando hay conversaciones seleccionadas */}
       {selectedIds.size > 0 && (
-        <div className="p-2.5 mx-2 my-1.5 rounded-xl bg-[#1a2333] border border-blue-500/40 shadow-xl flex flex-col gap-2 animate-in fade-in slide-in-from-top-1 duration-150 z-20">
+        <div className="bg-surface-elevated border border-surface-border rounded-lg shadow-xl p-2.5 mx-2 my-1.5 flex flex-col gap-2 animate-in fade-in slide-in-from-top-1 duration-150 z-20">
           <div className="flex items-center justify-between text-[11px] text-blue-200 px-1">
             <span className="font-semibold">{selectedIds.size} seleccionada(s)</span>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleToggleSelectAll}
-                className="text-[10px] text-blue-400 hover:text-blue-300 underline cursor-pointer"
+                className="text-[10px] text-accent hover:underline cursor-pointer"
               >
                 {allSelected ? 'Deseleccionar todo' : 'Seleccionar todo'}
               </button>
@@ -468,7 +476,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => handleBulkPin(true)}
-              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-blue-600/30 hover:bg-blue-600/50 border border-blue-500/40 text-[11px] text-blue-200 font-medium transition-all"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md bg-accent/20 hover:bg-accent/30 border border-accent/40 text-xs text-blue-200 font-medium transition-colors"
               title="Anclar seleccionados"
             >
               <Pin className="w-3 h-3" />
@@ -477,7 +485,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={() => handleBulkPin(false)}
-              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-[11px] text-slate-300 font-medium transition-all"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-xs text-slate-300 font-medium transition-colors"
               title="Desanclar seleccionados"
             >
               <span>Desanclar</span>
@@ -485,7 +493,7 @@ export function Sidebar({
             <button
               type="button"
               onClick={handleRequestBulkDelete}
-              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-lg bg-red-600/25 hover:bg-red-600/45 border border-red-500/40 text-[11px] text-red-300 font-medium transition-all"
+              className="flex items-center justify-center gap-1 py-1.5 px-2 rounded-md bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-xs text-rose-300 font-medium transition-colors"
               title="Eliminar seleccionados"
             >
               <Trash2 className="w-3 h-3" />
@@ -512,8 +520,8 @@ export function Sidebar({
                 <button
                   type="button"
                   onClick={() => setIsSortMenuOpen(!isSortMenuOpen)}
-                  className={`p-1 rounded hover:text-slate-300 transition-colors ${
-                    projectSortBy !== 'recent' ? 'text-blue-400 bg-blue-900/30' : ''
+                  className={`p-1 rounded-md hover:text-slate-300 transition-colors ${
+                    projectSortBy !== 'recent' ? 'text-accent bg-accent/15' : ''
                   }`}
                   title="Ordenar proyectos (Default: Más reciente con el que se ha hablado)"
                 >
@@ -521,8 +529,8 @@ export function Sidebar({
                 </button>
 
                 {isSortMenuOpen && (
-                  <div className="absolute right-0 top-full mt-1.5 z-50 w-48 bg-[#1a1d24] border border-[#2a303c] rounded-xl shadow-2xl p-1 flex flex-col text-[11px] backdrop-blur-md animate-in fade-in">
-                    <div className="px-2.5 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-[#262c37] mb-1">
+                  <div className="absolute right-0 top-full mt-1.5 z-50 w-48 bg-surface-elevated border border-surface-border rounded-lg shadow-xl p-1 flex flex-col text-xs backdrop-blur-md animate-in fade-in">
+                    <div className="px-2.5 py-1 text-[10px] font-semibold text-slate-400 uppercase tracking-wider border-b border-surface-border mb-1">
                       Ordenar Proyectos
                     </div>
                     <button
@@ -531,10 +539,10 @@ export function Sidebar({
                         setProjectSortBy('recent');
                         setIsSortMenuOpen(false);
                       }}
-                      className={`px-2.5 py-1.5 rounded-lg text-left transition-colors flex items-center justify-between ${
+                      className={`px-2.5 py-1.5 rounded-md text-left transition-colors flex items-center justify-between ${
                         projectSortBy === 'recent'
-                          ? 'bg-blue-600/20 text-blue-400 font-semibold'
-                          : 'text-slate-300 hover:bg-[#222731]'
+                          ? 'bg-accent/15 text-accent font-semibold'
+                          : 'text-slate-300 hover:bg-surface-hover'
                       }`}
                     >
                       <span>Más reciente (Default)</span>
@@ -546,10 +554,10 @@ export function Sidebar({
                         setProjectSortBy('name-asc');
                         setIsSortMenuOpen(false);
                       }}
-                      className={`px-2.5 py-1.5 rounded-lg text-left transition-colors flex items-center justify-between ${
+                      className={`px-2.5 py-1.5 rounded-md text-left transition-colors flex items-center justify-between ${
                         projectSortBy === 'name-asc'
-                          ? 'bg-blue-600/20 text-blue-400 font-semibold'
-                          : 'text-slate-300 hover:bg-[#222731]'
+                          ? 'bg-accent/15 text-accent font-semibold'
+                          : 'text-slate-300 hover:bg-surface-hover'
                       }`}
                     >
                       <span>Alfabético (A - Z)</span>
@@ -561,10 +569,10 @@ export function Sidebar({
                         setProjectSortBy('name-desc');
                         setIsSortMenuOpen(false);
                       }}
-                      className={`px-2.5 py-1.5 rounded-lg text-left transition-colors flex items-center justify-between ${
+                      className={`px-2.5 py-1.5 rounded-md text-left transition-colors flex items-center justify-between ${
                         projectSortBy === 'name-desc'
-                          ? 'bg-blue-600/20 text-blue-400 font-semibold'
-                          : 'text-slate-300 hover:bg-[#222731]'
+                          ? 'bg-accent/15 text-accent font-semibold'
+                          : 'text-slate-300 hover:bg-surface-hover'
                       }`}
                     >
                       <span>Alfabético (Z - A)</span>
@@ -576,10 +584,10 @@ export function Sidebar({
                         setProjectSortBy('convos-count');
                         setIsSortMenuOpen(false);
                       }}
-                      className={`px-2.5 py-1.5 rounded-lg text-left transition-colors flex items-center justify-between ${
+                      className={`px-2.5 py-1.5 rounded-md text-left transition-colors flex items-center justify-between ${
                         projectSortBy === 'convos-count'
-                          ? 'bg-blue-600/20 text-blue-400 font-semibold'
-                          : 'text-slate-300 hover:bg-[#222731]'
+                          ? 'bg-accent/15 text-accent font-semibold'
+                          : 'text-slate-300 hover:bg-surface-hover'
                       }`}
                     >
                       <span>Nº de conversaciones</span>
@@ -592,7 +600,7 @@ export function Sidebar({
               <button
                 type="button"
                 onClick={() => setIsSelectMode(!isSelectMode)}
-                className="hover:text-slate-300 transition-colors p-1"
+                className="hover:text-slate-300 transition-colors p-1 rounded-md"
                 title="Filtrar / Selección múltiple"
               >
                 <SlidersHorizontal className="w-3.5 h-3.5" />
@@ -601,11 +609,11 @@ export function Sidebar({
                 type="button"
                 onClick={handleBrowseAndAddProject}
                 disabled={isBrowsingProject}
-                className="hover:text-slate-300 transition-colors p-1"
+                className="hover:text-slate-300 transition-colors p-1 rounded-md"
                 title="Seleccionar carpeta para nuevo proyecto workspace"
               >
                 {isBrowsingProject ? (
-                  <div className="w-3.5 h-3.5 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                  <div className="w-3.5 h-3.5 border-2 border-accent/30 border-t-accent rounded-full animate-spin" />
                 ) : (
                   <FolderPlus className="w-3.5 h-3.5" />
                 )}
@@ -628,7 +636,7 @@ export function Sidebar({
                     <button
                       type="button"
                       onClick={() => toggleProjectCollapse(project.name)}
-                      className="flex items-center justify-between px-1.5 py-1 text-slate-400 hover:text-slate-200 transition-colors rounded-lg group text-left"
+                      className="flex items-center justify-between px-1.5 py-1 text-slate-400 hover:text-slate-200 hover:bg-surface-hover transition-colors rounded-md group text-left"
                       title={project.path}
                     >
                       <div className="flex items-center gap-2 truncate">
@@ -648,7 +656,7 @@ export function Sidebar({
 
                     {/* Lista de Conversaciones bajo el proyecto */}
                     {!isCollapsed && (
-                      <div className="flex flex-col gap-0.5 ml-2 pl-2 border-l border-[#1f242e]">
+                      <div className="flex flex-col gap-0.5 ml-2 pl-2 border-l border-surface-border">
                         {project.convos.length === 0 ? (
                           <div className="py-1 text-slate-500 text-[11px] italic">
                             Sin conversaciones aún
@@ -666,7 +674,7 @@ export function Sidebar({
         </div>
 
         {/* SECCIÓN 2: CONVERSACIONES (Globales / Sin Proyecto) */}
-        <div className="flex flex-col gap-1 pt-1 border-t border-[#1e222b]/80">
+        <div className="flex flex-col gap-1 pt-1 border-t border-surface-border">
           <div className="flex items-center justify-between px-1 py-1 text-slate-400 text-xs font-medium">
             <div className="flex items-center gap-1.5">
               <span>Conversaciones</span>
@@ -695,15 +703,15 @@ export function Sidebar({
       </div>
 
       {/* Pie del Sidebar: Cuenta activa y Botón Settings */}
-      <div className="p-3 border-t border-[#1e222b] bg-[#111317] flex flex-col gap-2">
+      <div className="p-2.5 border-t border-surface-border bg-sidebar flex flex-col gap-2">
         <div className="flex items-center justify-between">
           {activeAccountEmail ? (
-            <div className="flex items-center gap-2 px-2 py-1 rounded-lg bg-[#1a1d24] border border-[#262c37] text-[11px] min-w-0 flex-1 mr-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0" />
-              <span className="text-slate-300 truncate font-mono">{activeAccountEmail}</span>
+            <div className="flex items-center gap-2 px-2 py-1 rounded-md bg-surface border border-surface-border text-slate-300 font-mono text-[11px] min-w-0 flex-1 mr-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              <span className="truncate">{activeAccountEmail}</span>
             </div>
           ) : (
-            <div className="text-[11px] text-slate-500">Sin cuenta activa</div>
+            <div className="text-[11px] text-slate-500 font-mono">Sin cuenta activa</div>
           )}
 
           {onSyncAntigravity && (
@@ -711,10 +719,10 @@ export function Sidebar({
               type="button"
               onClick={onSyncAntigravity}
               disabled={isSyncing}
-              className="p-1.5 rounded-lg bg-[#1a1d24] hover:bg-[#222731] text-slate-400 hover:text-white border border-[#262c37] transition-all shrink-0"
+              className="p-1.5 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-slate-400 hover:text-white transition-colors shrink-0"
               title="Sincronizar con Antigravity Desktop"
             >
-              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-blue-400' : ''}`} />
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-accent' : ''}`} />
             </button>
           )}
         </div>
@@ -722,7 +730,7 @@ export function Sidebar({
         <button
           type="button"
           onClick={onOpenSettings}
-          className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#1a1d24]/60 hover:bg-[#1a1d24] text-slate-300 hover:text-white transition-all text-xs font-medium border border-[#262c37]"
+          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md bg-surface hover:bg-surface-hover border border-surface-border text-xs text-slate-300 hover:text-white transition-colors"
         >
           <div className="flex items-center gap-2">
             <Settings className="w-3.5 h-3.5 text-slate-400" />
@@ -735,34 +743,34 @@ export function Sidebar({
       {/* Modal de Confirmación para Eliminación */}
       {confirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm">
-          <div className="bg-[#1a1d24] border border-[#2a303c] rounded-2xl p-5 max-w-sm w-full shadow-2xl flex flex-col gap-4">
+          <div className="bg-surface-elevated border border-surface-border rounded-xl shadow-2xl p-5 max-w-sm w-full flex flex-col gap-4">
             <div className="flex items-center gap-3 text-red-400">
-              <div className="w-9 h-9 rounded-xl bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
+              <div className="w-9 h-9 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center shrink-0">
                 <AlertTriangle className="w-4 h-4 text-red-400" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-white">Eliminar conversación</h3>
+                <h3 className="text-sm font-bold text-white font-sans">Eliminar conversación</h3>
                 <p className="text-[11px] text-slate-400">Esta acción no se puede deshacer</p>
               </div>
             </div>
 
-            <p className="text-xs text-slate-300 leading-relaxed">
+            <p className="text-xs text-slate-300 leading-relaxed font-sans">
               ¿Estás seguro de que deseas eliminar permanentemente{' '}
               <span className="font-semibold text-white">«{confirmModal.title}»</span>?
             </p>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-[#262c37]">
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-surface-border">
               <button
                 type="button"
                 onClick={() => setConfirmModal(null)}
-                className="px-3 py-1.5 rounded-xl hover:bg-slate-800 text-slate-300 text-xs"
+                className="px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-surface-border text-slate-300 text-xs transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={handleConfirmDelete}
-                className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-semibold"
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-500 text-white text-xs font-semibold shadow-sm transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Eliminar</span>
@@ -789,12 +797,12 @@ export function Sidebar({
     return (
       <div
         key={convo.id}
-        className={`group relative flex items-center justify-between px-2.5 py-1.5 rounded-lg cursor-pointer transition-all text-xs ${
+        className={`group relative flex items-center justify-between cursor-pointer transition-colors text-xs ${
           isActive
-            ? 'bg-[#222731] text-white font-normal shadow-sm'
+            ? 'bg-surface-active text-white border-l-2 border-accent pl-2.5 pr-2 py-1.5 rounded-md'
             : isSelected
-            ? 'bg-blue-900/40 text-blue-200'
-            : 'text-slate-300 hover:text-white hover:bg-[#1a1d24]/70'
+            ? 'bg-accent/15 text-blue-300 border border-accent/30 px-2.5 py-1.5 rounded-md'
+            : 'text-slate-400 hover:text-slate-200 hover:bg-surface-hover px-2.5 py-1.5 rounded-md'
         }`}
         onClick={() => {
           if (isSelectMode) {
@@ -815,7 +823,7 @@ export function Sidebar({
             title={isSelected ? 'Deseleccionar conversación' : 'Seleccionar conversación'}
           >
             {isSelected ? (
-              <CheckSquare className="w-3.5 h-3.5 text-blue-400" />
+              <CheckSquare className="w-3.5 h-3.5 text-accent" />
             ) : (
               <Square className="w-3.5 h-3.5 text-slate-500 hover:text-slate-300" />
             )}
@@ -829,15 +837,15 @@ export function Sidebar({
         </div>
 
         {/* Tiempo relativo a la derecha (como en Antigravity: "4m", "59m", "6h") */}
-        <div className="flex items-center gap-1.5 shrink-0 text-[11px] text-slate-500 group-hover:opacity-0 transition-opacity font-mono">
+        <div className="flex items-center gap-1.5 shrink-0 font-mono text-[10px] text-slate-500 group-hover:opacity-0 transition-opacity">
           {isActive && (
-            <span className="w-1.5 h-1.5 rounded-full bg-sky-400 shrink-0" />
+            <span className="w-1.5 h-1.5 rounded-full bg-accent shrink-0" />
           )}
           <span>{relTime}</span>
         </div>
 
         {/* Acciones Rápidas en Hover (Anclar y Eliminar) */}
-        <div className="flex items-center gap-0.5 absolute right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-[#222731] px-1 py-0.5 rounded">
+        <div className="flex items-center gap-0.5 absolute right-1.5 opacity-0 group-hover:opacity-100 transition-opacity bg-surface-elevated border border-surface-border rounded px-1 py-0.5 shadow-sm">
           <button
             type="button"
             onClick={(e) => {
@@ -852,7 +860,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={(e) => handleRequestSingleDelete(convo, e)}
-            className="p-1 rounded text-slate-400 hover:text-red-400"
+            className="p-1 rounded text-slate-400 hover:text-rose-400"
             title="Eliminar"
           >
             <Trash2 className="w-3 h-3" />
